@@ -1,14 +1,38 @@
-import React, { useState } from "react";
-import { Link } from "react-router-dom";
+import React, { useState, useContext } from "react";
+import { Link, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
+import { useToast } from "@/hooks/use-toast";
+import { AuthContext } from "../AuthContext";
 
 const Login = () => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [loading, setLoading] = useState(false);
+  const { toast } = useToast();
+  const navigate = useNavigate();
+  const { login } = useContext(AuthContext);
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    console.log("Login attempt:", { email, password });
+    setLoading(true);
+
+    try {
+      await login(email, password);
+      toast({
+        title: "Login Successful",
+        description: "Welcome back!",
+        variant: "success",
+      });
+      navigate("/profile"); // Redirect to home page
+    } catch (error) {
+      toast({
+        title: "Login Failed",
+        description: error.message || "Invalid email or password.",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -71,38 +95,13 @@ const Login = () => {
           </div>
 
           {/* Submit Button */}
-          <Button 
-            type="submit" 
+          <Button
+            type="submit"
             className="w-full py-6 font-['Space_Grotesk'] font-bold"
+            disabled={loading}
           >
-            SIGN IN
+            {loading ? "SIGNING IN..." : "SIGN IN"}
           </Button>
-
-          {/* Divider */}
-          <div className="relative my-8">
-            <div className="absolute inset-0 flex items-center">
-              <span className="w-full border-t border-[rgba(229,228,226,0.3)]"></span>
-            </div>
-            <div className="relative flex justify-center">
-              <span className="px-2 bg-black text-[rgba(229,228,226,0.5)] uppercase tracking-[1px] text-xs">
-                Or continue with
-              </span>
-            </div>
-          </div>
-
-          {/* Google Button */}
-          <button
-            type="button"
-            className="w-full bg-transparent border border-[rgba(229,228,226,0.5)] text-white py-3 cursor-pointer flex items-center justify-center transition-brutal hover:bg-[rgba(229,228,226,0.1)]"
-          >
-            <svg
-              className="mr-2 h-4 w-4 fill-current"
-              viewBox="0 0 24 24"
-            >
-              <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8z" />
-            </svg>
-            GOOGLE
-          </button>
         </form>
 
         {/* Sign Up Link */}

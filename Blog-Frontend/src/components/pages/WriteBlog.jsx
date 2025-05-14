@@ -1,15 +1,36 @@
-import React, { useState } from "react";
+import React, { useState, useEffect, useContext } from "react";
 import { ArrowUp } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { AuthContext } from "../AuthContext";
+import { useNavigate } from "react-router-dom";
+import apiFetch from "../utils/api";
 
 const WriteBlog = () => {
+  const { isLoggedIn } = useContext(AuthContext);
   const { toast } = useToast();
+  const navigate = useNavigate();
   const [blogContent, setBlogContent] = useState("");
   const [codeContent, setCodeContent] = useState("");
+  const [language, setLanguage] = useState("javascript");
   const [title, setTitle] = useState("");
   const [selectedFile, setSelectedFile] = useState(null);
   const [previewUrl, setPreviewUrl] = useState(null);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (!isLoggedIn) {
+      console.log("WriteBlog: User not logged in, redirecting to /login");
+      navigate("/login");
+    }
+  }, [isLoggedIn, navigate]);
 
   const handleFileChange = (e) => {
     if (e.target.files && e.target.files[0]) {
@@ -34,7 +55,7 @@ const WriteBlog = () => {
     });
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
 
     // Validate form
@@ -56,20 +77,60 @@ const WriteBlog = () => {
       return;
     }
 
-    // Simulate API call
-    console.log("Submitting blog:", { title, blogContent, codeContent, selectedFile });
+    setLoading(true);
 
-    toast({
-      title: "Blog submitted successfully!",
-      description: "Your blog post has been created.",
-    });
+    try {
+      // Prepare form data for multipart request
+      const formData = new FormData();
+      formData.append("title", title);
+      formData.append("content", blogContent);
 
-    // Reset form
-    setTitle("");
-    setBlogContent("");
-    setCodeContent("");
-    setSelectedFile(null);
-    setPreviewUrl(null);
+      // Include code snippet if provided
+      if (codeContent.trim()) {
+        formData.append("language", language);
+        formData.append("code", codeContent);
+      }
+
+      // Include featured image if selected
+      if (selectedFile) {
+        formData.append("image", selectedFile);
+      }
+
+      // Make API call to create blog post
+      const response = await apiFetch("/api/blogs", {
+        method: "POST",
+        body: formData,
+      });
+
+      const data = await response.json();
+      console.log("Blog created successfully:", data);
+
+      toast({
+        title: "Blog submitted successfully!",
+        description: "Your blog post has been created.",
+        variant: "success",
+      });
+
+      // Reset form
+      setTitle("");
+      setBlogContent("");
+      setCodeContent("");
+      setLanguage("javascript");
+      setSelectedFile(null);
+      setPreviewUrl(null);
+
+      // Navigate to user profile
+      navigate("/profile");
+    } catch (error) {
+      console.error("Failed to create blog:", error);
+      toast({
+        title: "Error",
+        description: error.message || "Failed to create blog post.",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -95,6 +156,7 @@ const WriteBlog = () => {
               onChange={(e) => setTitle(e.target.value)}
               className="p-4 border-4 border-white bg-black text-xl font-['Space_Grotesk'] focus:border-[#E5E4E2] outline-none transition-brutal"
               placeholder="Enter a captivating title"
+              disabled={loading}
             />
           </div>
 
@@ -107,18 +169,39 @@ const WriteBlog = () => {
               onChange={(e) => setBlogContent(e.target.value)}
               className="min-h-[300px] p-6 bg-black border border-[rgba(229,228,226,0.5)] font-['Inter'] text-lg leading-relaxed outline-none inset-shadow transition-brutal"
               placeholder="Start writing your blog post here..."
+              disabled={loading}
             />
+          </div>
+
+          {/* Language Selection */}
+          <div className="grid gap-2">
+            <label className="uppercase text-xs tracking-[1px] text-[#E5E4E2]">
+              Code Language (Optional)
+            </label>
+            <Select value={language} onValueChange={setLanguage} disabled={loading}>
+              <SelectTrigger className="p-4 bg-black border border-[rgba(229,228,226,0.5)] text-white outline-none transition-brutal focus:border-white">
+                <SelectValue placeholder="Select a language" />
+              </SelectTrigger>
+              <SelectContent className="bg-black border border-[rgba(229,228,226,0.5)] text-white">
+                <SelectItem value="javascript">JavaScript</SelectItem>
+                <SelectItem value="python">Python</SelectItem>
+                <SelectItem value="java">Java</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
 
           {/* Code Content */}
           <div className="grid gap-2">
-            <label className="uppercase text-xs tracking-[1px] text-[#E5E4E2]">Code Snippet (Optional)</label>
+            <label className="uppercase text-xs tracking-[1px] text-[#E5E4E2]">
+              Code Snippet (Optional)
+            </label>
             <textarea
               id="codeContent"
               value={codeContent}
               onChange={(e) => setCodeContent(e.target.value)}
               className="min-h-[200px] p-6 bg-black border border-[rgba(229,228,226,0.5)] font-mono outline-none inset-shadow transition-brutal"
               placeholder="// Add your code snippet here..."
+              disabled={loading}
             />
           </div>
 
@@ -134,6 +217,7 @@ const WriteBlog = () => {
                     accept="image/*"
                     onChange={handleFileChange}
                     className="hidden"
+                    disabled={loading}
                   />
                   <label
                     htmlFor="featured-image"
@@ -178,16 +262,18 @@ const WriteBlog = () => {
               type="button"
               className="bg-transparent border border-[rgba(229,228,226,0.5)] text-white py-3 px-6 cursor-pointer flex items-center transition-brutal hover:bg-[rgba(229,228,226,0.1)]"
               onClick={scrollToTop}
+              disabled={loading}
             >
               <ArrowUp className="mr-2 h-4 w-4" />
               Back to Top
             </button>
 
-            <Button 
-              type="submit" 
+            <Button
+              type="submit"
               className="py-6 px-8 font-['Space_Grotesk'] font-bold"
+              disabled={loading}
             >
-              PUBLISH BLOG
+              {loading ? "PUBLISHING..." : "PUBLISH BLOG"}
             </Button>
           </div>
         </form>

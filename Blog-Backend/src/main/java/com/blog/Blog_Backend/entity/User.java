@@ -1,45 +1,73 @@
 package com.blog.Blog_Backend.entity;
 
+import org.springframework.data.annotation.CreatedDate;
 import org.springframework.data.annotation.Id;
+import org.springframework.data.annotation.LastModifiedDate;
 import org.springframework.data.mongodb.core.mapping.Document;
 
-@Document(collection = "Users")
-public class User {
+import java.util.Base64;
+import java.util.Date;
 
+@Document(collection = "users")
+public class User {
     @Id
-    private String userId;
+    private String id;
+
     private String name;
     private String email;
-    private String phoneNumber;
-    private String x;
-    private String linkedIn;
-    private String gitHub;
-    private String aboutMe;
+    private String password;
+    private String phone;
+    private byte[] photo;
+    private String linkedin;
+    private String github;
+    private String twitter;
+    private String about;
 
-    // No-arg constructor
+    @CreatedDate
+    private Date createdAt;
+
+    @LastModifiedDate
+    private Date updatedAt;
+
+    // No-args constructor
     public User() {
     }
 
     // All-args constructor
-    public User(String userId, String name, String email, String phoneNumber, String x, String linkedIn, String gitHub, String aboutMe) {
-        this.userId = userId;
+    public User(String id,
+                String name,
+                String email,
+                String password,
+                String phone,
+                byte[] photo,
+                String linkedin,
+                String github,
+                String twitter,
+                String about,
+                Date createdAt,
+                Date updatedAt) {
+        this.id = id;
         this.name = name;
         this.email = email;
-        this.phoneNumber = phoneNumber;
-        this.x = x;
-        this.linkedIn = linkedIn;
-        this.gitHub = gitHub;
-        this.aboutMe = aboutMe;
+        this.password = password;
+        this.phone = phone;
+        this.photo = photo;
+        this.linkedin = linkedin;
+        this.github = github;
+        this.twitter = twitter;
+        this.about = about;
+        this.createdAt = createdAt;
+        this.updatedAt = updatedAt;
     }
 
-    // Getters and Setters
+    // Getters and setters
 
-    public String getUserId() {
-        return userId;
+    public String getId() {
+        return id;
     }
 
-    public void setUserId(String userId) {
-        this.userId = userId;
+    public void setId(String id) {
+        this.id = id;
     }
 
     public String getName() {
@@ -58,43 +86,76 @@ public class User {
         this.email = email;
     }
 
-    public String getPhoneNumber() {
-        return phoneNumber;
+    public String getPassword() {
+        return password;
     }
 
-    public void setPhoneNumber(String phoneNumber) {
-        this.phoneNumber = phoneNumber;
+    public void setPassword(String password) {
+        this.password = password;
     }
 
-    public String getX() {
-        return x;
+    public String getPhone() {
+        return phone;
     }
 
-    public void setX(String x) {
-        this.x = x;
+    public void setPhone(String phone) {
+        this.phone = phone;
     }
 
-    public String getLinkedIn() {
-        return linkedIn;
+    // Return Base64-encoded photo string
+    public String getPhoto() {
+        return photo != null ? Base64.getEncoder().encodeToString(photo) : null;
     }
 
-    public void setLinkedIn(String linkedIn) {
-        this.linkedIn = linkedIn;
+    public void setPhoto(byte[] photo) {
+        this.photo = photo;
     }
 
-    public String getGitHub() {
-        return gitHub;
+    public String getLinkedin() {
+        return linkedin;
     }
 
-    public void setGitHub(String gitHub) {
-        this.gitHub = gitHub;
+    public void setLinkedin(String linkedin) {
+        this.linkedin = linkedin;
     }
 
-    public String getAboutMe() {
-        return aboutMe;
+    public String getGithub() {
+        return github;
     }
 
-    public void setAboutMe(String aboutMe) {
-        this.aboutMe = aboutMe;
+    public void setGithub(String twitter) {
+        this.github = github;
+    }
+
+    public String getTwitter() {
+        return twitter;
+    }
+
+    public void setTwitter(String twitter) {
+        this.twitter = github;
+    }
+
+    public String getAbout() {
+        return about;
+    }
+
+    public void setAbout(String about) {
+        this.about = about;
+    }
+
+    public Date getCreatedAt() {
+        return createdAt;
+    }
+
+    public void setCreatedAt(Date createdAt) {
+        this.createdAt = createdAt;
+    }
+
+    public Date getUpdatedAt() {
+        return updatedAt;
+    }
+
+    public void setUpdatedAt(Date updatedAt) {
+        this.updatedAt = updatedAt;
     }
 }

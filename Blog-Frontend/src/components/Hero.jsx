@@ -90,7 +90,7 @@ const Hero = () => {
       <div className="relative z-10 max-w-7xl mx-auto px-6 py-16 border-4 border-white backdrop-blur-sm bg-black/80">
         <div className="max-w-3xl mx-auto text-center grid gap-8">
           <h1 className="text-4xl sm:text-5xl md:text-7xl leading-none font-['Space_Grotesk'] font-bold tracking-[-1px] animate-[float_6s_ease-in-out_infinite]">
-            NEON ECHO <span className="text-[#E5E4E2]">BLOG</span>
+            AIDEN <span className="text-[#E5E4E2]">BLOG</span>
           </h1>
 
           <p className="text-lg leading-relaxed opacity-85 max-w-2xl mx-auto text-white">
@@ -106,9 +106,9 @@ const Hero = () => {
               </Button>
             </Link>
 
-            <Link to="/login">
-              <Button 
-                variant="outline" 
+            <Link to="/blogs">
+              <Button
+                variant="outline"
                 className="font-['Space_Grotesk'] py-6 px-8"
               >
                 EXPLORE BLOGS
@@ -118,12 +118,14 @@ const Hero = () => {
         </div>
       </div>
 
-      <style jsx>{`
-        @keyframes float {
-          0%, 100% { transform: translateY(0); }
-          50% { transform: translateY(-10px); }
-        }
-      `}</style>
+      <style>
+        {`
+          @keyframes float {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-10px); }
+          }
+        `}
+      </style>
     </div>
   );
 };

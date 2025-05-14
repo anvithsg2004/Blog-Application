@@ -1,17 +1,25 @@
 import React, { useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
+import { useToast } from "@/hooks/use-toast";
+import { registerUser } from "../utils/api";
 
 const Register = () => {
+  const { toast } = useToast();
+  const navigate = useNavigate();
   const [formData, setFormData] = useState({
     name: "",
     email: "",
+    password: "",
     phone: "",
     photo: null,
     linkedin: "",
     github: "",
+    twitter: "",
     about: "",
   });
+  const [previewUrl, setPreviewUrl] = useState(null);
+  const [loading, setLoading] = useState(false);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -23,16 +31,65 @@ const Register = () => {
 
   const handleFileChange = (e) => {
     if (e.target.files && e.target.files[0]) {
+      const file = e.target.files[0];
       setFormData({
         ...formData,
-        photo: e.target.files[0],
+        photo: file,
       });
+
+      // Create a preview URL
+      const fileReader = new FileReader();
+      fileReader.onload = () => {
+        if (fileReader.result) {
+          setPreviewUrl(fileReader.result);
+        }
+      };
+      fileReader.readAsDataURL(file);
     }
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    console.log("Registration attempt:", formData);
+    setLoading(true);
+
+    try {
+      // Prepare form data for multipart request
+      const data = new FormData();
+      // Stringify the user data and append it as the "user" part
+      const userData = {
+        name: formData.name,
+        email: formData.email,
+        password: formData.password,
+        phone: formData.phone,
+        linkedin: formData.linkedin,
+        github: formData.github,
+        twitter: formData.twitter,
+        about: formData.about,
+      };
+      data.append("user", JSON.stringify(userData));
+      if (formData.photo) {
+        data.append("photo", formData.photo);
+      }
+
+      await registerUser(data);
+
+      toast({
+        title: "Registration Successful",
+        description: "Please log in to continue.",
+        variant: "success",
+      });
+
+      // Redirect to login page
+      navigate("/login");
+    } catch (error) {
+      toast({
+        title: "Registration Failed",
+        description: error.message || "An error occurred while registering.",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -89,6 +146,26 @@ const Register = () => {
               />
             </div>
 
+            {/* Password Input */}
+            <div className="grid gap-2">
+              <label
+                htmlFor="password"
+                className="uppercase text-xs tracking-[1px] text-[#E5E4E2]"
+              >
+                Password
+              </label>
+              <input
+                id="password"
+                className="w-full p-4 bg-black border border-[rgba(229,228,226,0.5)] focus:border-white text-white outline-none inset-shadow transition-brutal"
+                name="password"
+                type="password"
+                value={formData.password}
+                onChange={handleChange}
+                placeholder="••••••••"
+                required
+              />
+            </div>
+
             {/* Phone Input */}
             <div className="grid gap-2">
               <label
@@ -108,6 +185,7 @@ const Register = () => {
               />
             </div>
 
+            {/* Photo Input */}
             <div className="grid gap-2">
               <label
                 htmlFor="photo"
@@ -115,14 +193,25 @@ const Register = () => {
               >
                 Photo
               </label>
-              <input
-                id="photo"
-                className="w-full p-3 bg-black border border-[rgba(229,228,226,0.5)] focus:border-white text-white outline-none transition-brutal file:mr-4 file:py-2 file:px-4 file:rounded-none file:border-0 file:text-sm file:font-medium file:bg-[rgba(229,228,226,0.2)] file:text-white hover:file:bg-[rgba(229,228,226,0.3)]"
-                name="photo"
-                type="file"
-                accept="image/*"
-                onChange={handleFileChange}
-              />
+              <div className="relative">
+                <input
+                  id="photo"
+                  className="w-full p-3 bg-black border border-[rgba(229,228,226,0.5)] focus:border-white text-white outline-none transition-brutal file:mr-4 file:py-2 file:px-4 file:rounded-none file:border-0 file:text-sm file:font-medium file:bg-[rgba(229,228,226,0.2)] file:text-white hover:file:bg-[rgba(229,228,226,0.3)]"
+                  name="photo"
+                  type="file"
+                  accept="image/*"
+                  onChange={handleFileChange}
+                />
+                {previewUrl && (
+                  <div className="mt-2 w-16 h-16 overflow-hidden border border-[rgba(229,228,226,0.3)]">
+                    <img
+                      src={previewUrl}
+                      alt="Preview"
+                      className="w-full h-full object-cover"
+                    />
+                  </div>
+                )}
+              </div>
             </div>
 
             {/* LinkedIn Input */}
@@ -144,6 +233,7 @@ const Register = () => {
               />
             </div>
 
+            {/* GitHub Input */}
             <div className="grid gap-2">
               <label
                 htmlFor="github"
@@ -159,6 +249,25 @@ const Register = () => {
                 value={formData.github}
                 onChange={handleChange}
                 placeholder="https://github.com/username"
+              />
+            </div>
+
+            {/* Twitter/X Input */}
+            <div className="grid gap-2 md:col-span-2">
+              <label
+                htmlFor="twitter"
+                className="uppercase text-xs tracking-[1px] text-[#E5E4E2]"
+              >
+                X (Twitter) Profile
+              </label>
+              <input
+                id="twitter"
+                className="w-full p-4 bg-black border border-[rgba(229,228,226,0.5)] focus:border-white text-white outline-none inset-shadow transition-brutal"
+                name="twitter"
+                type="url"
+                value={formData.twitter}
+                onChange={handleChange}
+                placeholder="https://twitter.com/username"
               />
             </div>
 
@@ -182,38 +291,13 @@ const Register = () => {
           </div>
 
           {/* Submit Button */}
-          <Button 
-            type="submit" 
+          <Button
+            type="submit"
             className="w-full py-6 font-['Space_Grotesk'] font-bold"
+            disabled={loading}
           >
-            CREATE ACCOUNT
+            {loading ? "CREATING..." : "CREATE ACCOUNT"}
           </Button>
-
-          {/* Divider */}
-          <div className="relative my-8">
-            <div className="absolute inset-0 flex items-center">
-              <span className="w-full border-t border-[rgba(229,228,226,0.3)]"></span>
-            </div>
-            <div className="relative flex justify-center">
-              <span className="px-2 bg-black text-[rgba(229,228,226,0.5)] uppercase tracking-[1px] text-xs">
-                Or register with
-              </span>
-            </div>
-          </div>
-
-          {/* Google Button */}
-          <button
-            type="button"
-            className="w-full bg-transparent border border-[rgba(229,228,226,0.5)] text-white py-3 cursor-pointer flex items-center justify-center transition-brutal hover:bg-[rgba(229,228,226,0.1)]"
-          >
-            <svg
-              className="mr-2 h-4 w-4 fill-current"
-              viewBox="0 0 24 24"
-            >
-              <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8z" />
-            </svg>
-            GOOGLE
-          </button>
         </form>
 
         {/* Sign In Link */}

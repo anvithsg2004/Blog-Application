@@ -1,10 +1,54 @@
-import React, { useState } from "react";
-import { Link } from "react-router-dom";
-import { Menu, X } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import React, { useState, useContext, useEffect } from "react";
+import { Link, useNavigate, useLocation } from "react-router-dom";
+import { Menu, X, LogOut } from "lucide-react";
+import { Button } from "./ui/button";
+import UserAvatar from "./UserAvatar";
+import { AuthContext } from "../components/AuthContext";
 
 const Navbar = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const navigate = useNavigate();
+  const location = useLocation();
+  const { isLoggedIn, user, loading, logout } = useContext(AuthContext) || {
+    isLoggedIn: false,
+    user: null,
+    loading: false,
+    logout: () => { },
+  };
+
+  useEffect(() => {
+    console.log("Navbar: isLoggedIn changed to", isLoggedIn, "user:", user);
+  }, [isLoggedIn, user]);
+
+  useEffect(() => {
+    console.log("Route changed to", location.pathname);
+  }, [location]);
+
+  const handleProfileClick = () => {
+    console.log("handleProfileClick: isLoggedIn:", isLoggedIn, "user:", user, "loading:", loading);
+    if (loading) {
+      console.log("handleProfileClick: Still loading, delaying navigation");
+      return; // Wait until loading is complete
+    }
+    if (isLoggedIn && user) {
+      console.log("Navigating to /profile");
+      navigate("/profile");
+    } else {
+      console.log("Navigating to /login");
+      navigate("/login");
+    }
+    setIsMenuOpen(false);
+  };
+
+  const handleLogout = () => {
+    logout();
+    navigate("/login");
+    setIsMenuOpen(false);
+  };
+
+  if (loading) {
+    return <div>Loading...</div>;
+  }
 
   return (
     <nav className="fixed top-0 left-0 w-full z-50 bg-black border-b border-[rgba(229,228,226,0.3)]">
@@ -13,13 +57,21 @@ const Navbar = () => {
           to="/"
           className="text-2xl md:text-3xl font-['Space_Grotesk'] font-bold tracking-[-1px] text-white no-underline"
         >
-          NEON ECHO
+          AIDEN
         </Link>
 
         {/* Desktop Links */}
         <div className="hidden md:flex items-center gap-8">
-          <NavLinks />
-          <AuthButtons />
+          <NavLinks isLoggedIn={isLoggedIn} />
+          {isLoggedIn ? (
+            <UserControls
+              userImage={user?.photo ? `data:image/jpeg;base64,${user.photo}` : null}
+              onProfileClick={handleProfileClick}
+              onLogout={handleLogout}
+            />
+          ) : (
+            <AuthButtons />
+          )}
         </div>
 
         {/* Mobile Menu Button */}
@@ -32,48 +84,73 @@ const Navbar = () => {
       </div>
 
       {/* Mobile Drawer */}
-      <div 
-        className={`fixed inset-0 bg-black z-50 transform ${
-          isMenuOpen ? "translate-x-0" : "translate-x-full"
-        } transition-transform duration-300 ease-in-out`}
+      <div
+        className={`fixed inset-0 bg-black z-50 transform ${isMenuOpen ? "translate-x-0" : "translate-x-full"
+          } transition-transform duration-300 ease-in-out`}
       >
-        <div className="max-w-7xl mx-auto p-6">
-          <div className="flex justify-between items-center mb-10">
-            <Link
-              to="/"
-              className="text-2xl font-['Space_Grotesk'] font-bold tracking-[-1px] text-white no-underline"
-              onClick={() => setIsMenuOpen(false)}
-            >
-              NEON ECHO
-            </Link>
-            <button
-              onClick={() => setIsMenuOpen(false)}
-              className="p-2 bg-transparent border-none text-white cursor-pointer transition-brutal hover:bg-[rgba(229,228,226,0.1)]"
-            >
-              <X size={24} />
-            </button>
-          </div>
+        <gatsby-focus-wrapper>
+          <div className="max-w-7xl mx-auto p-6">
+            <div className="flex justify-between items-center mb-10">
+              <Link
+                to="/"
+                className="text-2xl font-['Space_Grotesk'] font-bold tracking-[-1px] text-white no-underline"
+                onClick={() => setIsMenuOpen(false)}
+              >
+                AIDEN
+              </Link>
+              <button
+                onClick={() => setIsMenuOpen(false)}
+                className="p-2 bg-transparent border-none text-white cursor-pointer transition-brutal hover:bg-[rgba(229,228,226,0.1)]"
+              >
+                <X size={24} />
+              </button>
+            </div>
 
-          <div
-            className="flex flex-col gap-8"
-            onClick={() => setIsMenuOpen(false)}
-          >
-            <NavLinks vertical />
-            <div className="pt-8 border-t border-[rgba(229,228,226,0.3)]">
-              <AuthButtons vertical />
+            <div className="flex flex-col gap-8" onClick={() => setIsMenuOpen(false)}>
+              <NavLinks vertical isLoggedIn={isLoggedIn} />
+              <div className="pt-8 border-t border-[rgba(229,228,226,0.3)]">
+                {isLoggedIn ? (
+                  <div className="flex flex-col gap-4">
+                    <div className="flex items-center gap-4">
+                      <UserAvatar
+                        userImage={user?.photo ? `data:image/jpeg;base64,${user.photo}` : null}
+                        size="lg"
+                        onClick={handleProfileClick}
+                      />
+                      <div>
+                        <button
+                          onClick={handleProfileClick}
+                          className="text-white text-xl font-['Space_Grotesk'] font-bold no-underline bg-transparent border-none cursor-pointer transition-brutal hover:text-[#E5E4E2]"
+                        >
+                          MY PROFILE
+                        </button>
+                      </div>
+                    </div>
+                    <button
+                      onClick={handleLogout}
+                      className="flex items-center gap-2 text-white text-xl font-['Space_Grotesk'] font-bold no-underline bg-transparent border-none cursor-pointer transition-brutal hover:text-[#E5E4E2]"
+                    >
+                      <LogOut size={20} />
+                      LOGOUT
+                    </button>
+                  </div>
+                ) : (
+                  <AuthButtons vertical />
+                )}
+              </div>
             </div>
           </div>
-        </div>
+        </gatsby-focus-wrapper>
       </div>
     </nav>
   );
 };
 
-const NavLinks = ({ vertical = false }) => {
+const NavLinks = ({ vertical = false, isLoggedIn = false }) => {
   const links = [
     { name: "HOME", path: "/" },
-    { name: "BLOGS", path: "/" },
-    { name: "WRITE", path: "/write-blog" },
+    { name: "BLOGS", path: "/blogs" },
+    ...(isLoggedIn ? [] : [{ name: "WRITE", path: "/write-blog" }]), // Exclude "Write" when logged in
   ];
 
   return (
@@ -82,13 +159,8 @@ const NavLinks = ({ vertical = false }) => {
         <Link
           key={link.path}
           to={link.path}
-          className={`${
-            vertical 
-              ? "text-xl py-2" 
-              : "text-xs uppercase tracking-[1px]"
-          } text-white no-underline transition-brutal hover:text-[#E5E4E2] ${
-            !vertical && "hover:-translate-y-0.5"
-          }`}
+          className={`${vertical ? "text-xl py-2" : "text-xs uppercase tracking-[1px]"
+            } text-white no-underline transition-brutal hover:text-[#E5E4E2] ${!vertical ? "hover:-translate-y-0.5" : ""}`}
         >
           {link.name}
         </Link>
@@ -97,20 +169,37 @@ const NavLinks = ({ vertical = false }) => {
   );
 };
 
+const UserControls = ({ userImage, onProfileClick, onLogout }) => (
+  <div className="flex items-center gap-4">
+    <Link
+      to="/write-blog"
+      className="text-xs uppercase tracking-[1px] text-white no-underline transition-brutal hover:text-[#E5E4E2] hover:-translate-y-0.5"
+    >
+      WRITE
+    </Link>
+    <UserAvatar userImage={userImage} onClick={onProfileClick} />
+    <button
+      onClick={onLogout}
+      className="text-xs uppercase tracking-[1px] text-white no-underline transition-brutal hover:text-[#E5E4E2] hover:-translate-y-0.5 flex items-center gap-1"
+    >
+      <LogOut size={16} />
+      LOGOUT
+    </button>
+  </div>
+);
+
 const AuthButtons = ({ vertical = false }) => (
   <div className={`flex ${vertical ? "flex-col" : "flex-row"} gap-4`}>
     <Link to="/login">
-      <Button 
-        variant="outline" 
+      <Button
+        variant="outline"
         className="font-['Space_Grotesk'] font-bold hover:bg-[#E5E4E2] hover:text-black"
       >
         LOGIN
       </Button>
     </Link>
     <Link to="/register">
-      <Button 
-        className="font-['Space_Grotesk'] font-bold"
-      >
+      <Button className="font-['Space_Grotesk'] font-bold hover:bg-[#E5E4E2] hover:text-black">
         REGISTER
       </Button>
     </Link>

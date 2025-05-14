@@ -8,7 +8,7 @@ const BlogCard = ({ id, title, excerpt, imageUrl, authorName, date }) => {
       <div className="grid grid-cols-12 gap-0">
         {/* Image Section */}
         <div className="col-span-12 bg-black border border-[rgba(229,228,226,0.3)] relative overflow-hidden md:col-span-7">
-          <div className="aspect-[16/9] overflow-hidden h-full md:aspect-auto">
+          <div className="aspect-[16/9] overflow-hidden">
             <img
               src={imageUrl}
               alt={title}
