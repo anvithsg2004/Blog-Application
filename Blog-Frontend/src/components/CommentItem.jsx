@@ -1,26 +1,27 @@
-import React, { useState } from 'react';
+import React, { useState, useContext } from 'react';
 import { MessageCircle, Trash2 } from 'lucide-react';
 import CommentForm from './CommentForm';
+import { AuthContext } from '../components/AuthContext';
 
 const CommentItem = ({ comment, onAddReply, onDeleteComment, onDeleteReply }) => {
     const [isReplying, setIsReplying] = useState(false);
-    const currentUser = "Guest User"; // In a real app, get this from auth
+    const { user } = useContext(AuthContext);
 
     const handleReply = (content) => {
         onAddReply(comment.id, content);
         setIsReplying(false);
     };
 
-    const canDeleteComment = comment.author === currentUser;
-    const canDeleteReply = (reply) => reply.author === currentUser;
+    const canDeleteComment = user && comment.authorEmail === user.name;
+    const canDeleteReply = (reply) => user && reply.authorEmail === user.name;
 
     return (
         <div className="mb-10 last:mb-0">
             <div className="mb-4">
                 <div className="flex items-center justify-between mb-2">
-                    <h4 className="font-bold text-white">{comment.author}</h4>
+                    <h4 className="font-bold text-white">{comment.authorEmail}</h4>
                     <div className="flex items-center gap-2">
-                        <span className="text-xs text-[rgba(229,228,226,0.5)]">{comment.date}</span>
+                        <span className="text-xs text-[rgba(229,228,226,0.5)]">{comment.createdAt}</span>
                         {canDeleteComment && (
                             <button
                                 onClick={() => onDeleteComment(comment.id)}
@@ -57,9 +58,9 @@ const CommentItem = ({ comment, onAddReply, onDeleteComment, onDeleteReply }) =>
                     {comment.replies.map((reply) => (
                         <div key={reply.id} className="mb-4 last:mb-0">
                             <div className="flex items-center justify-between mb-2">
-                                <h4 className="font-bold text-white">{reply.author}</h4>
+                                <h4 className="font-bold text-white">{reply.authorEmail}</h4>
                                 <div className="flex items-center gap-2">
-                                    <span className="text-xs text-[rgba(229,228,226,0.5)]">{reply.date}</span>
+                                    <span className="text-xs text-[rgba(229,228,226,0.5)]">{reply.createdAt}</span>
                                     {canDeleteReply(reply) && (
                                         <button
                                             onClick={() => onDeleteReply(comment.id, reply.id)}

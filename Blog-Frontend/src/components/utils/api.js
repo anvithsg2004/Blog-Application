@@ -10,27 +10,31 @@ const apiFetch = async (url, options = {}) => {
     const authCredentials = getAuthCredentials();
     const headers = new Headers(options.headers || {});
 
-    // Only set Content-Type if the body is not FormData
     if (!(options.body instanceof FormData) && !headers.has("Content-Type")) {
         headers.set("Content-Type", "application/json");
     }
 
-    // Add Authorization header if credentials exist
     if (authCredentials) {
         headers.set("Authorization", `Basic ${authCredentials}`);
+        console.log("Authorization header size:", `Basic ${authCredentials}`.length);
     }
 
-    const response = await fetch(`${API_BASE_URL}${url}`, {
-        ...options,
-        headers,
-    });
+    try {
+        const response = await fetch(`${API_BASE_URL}${url}`, {
+            ...options,
+            headers,
+        });
 
-    if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.message || response.statusText);
+        if (!response.ok) {
+            const errorData = await response.json().catch(() => ({}));
+            throw new Error(errorData.message || response.statusText);
+        }
+
+        return response;
+    } catch (error) {
+        console.error(`API fetch error for ${url}:`, error);
+        throw error;
     }
-
-    return response;
 };
 
 // Export API methods

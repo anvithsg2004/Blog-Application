@@ -1,8 +1,14 @@
 import React from "react";
 import { Link } from "react-router-dom";
 import { ArrowRight } from "lucide-react";
+import { marked } from "marked";
+import DOMPurify from "dompurify";
 
 const BlogCard = ({ id, title, excerpt, imageUrl, authorName, date }) => {
+  // Parse and sanitize excerpt as Markdown
+  const markdownExcerpt = marked(excerpt || "No excerpt available");
+  const sanitizedExcerpt = DOMPurify.sanitize(markdownExcerpt);
+
   return (
     <article className="transition-brutal overflow-hidden">
       <div className="grid grid-cols-12 gap-0">
@@ -11,8 +17,12 @@ const BlogCard = ({ id, title, excerpt, imageUrl, authorName, date }) => {
           <div className="aspect-[16/9] overflow-hidden">
             <img
               src={imageUrl}
-              alt={title}
+              alt={title || "Blog image"}
               className="w-full h-full object-cover opacity-80 transition-all duration-700 ease-[cubic-bezier(0.215,0.61,0.355,1)] hover:opacity-100 hover:scale-105"
+              onError={(e) => {
+                e.target.src = "https://images.pexels.com/photos/3861969/pexels-photo-3861969.jpeg";
+                console.error(`Failed to load blog image for blog ID: ${id}`);
+              }}
             />
           </div>
         </div>
@@ -25,12 +35,13 @@ const BlogCard = ({ id, title, excerpt, imageUrl, authorName, date }) => {
           </div>
 
           <h2 className="text-xl md:text-2xl font-['Space_Grotesk'] font-bold tracking-[-1px] mb-4">
-            {title}
+            {title || "Untitled"}
           </h2>
 
-          <p className="text-lg leading-[160%] text-white/85 mb-6 flex-1">
-            {excerpt}
-          </p>
+          <div
+            className="text-lg leading-[160%] text-white/85 mb-6 flex-1 markdown-content"
+            dangerouslySetInnerHTML={{ __html: sanitizedExcerpt }}
+          />
 
           <Link
             to={`/blog/${id}`}
@@ -41,6 +52,26 @@ const BlogCard = ({ id, title, excerpt, imageUrl, authorName, date }) => {
           </Link>
         </div>
       </div>
+
+      <style jsx>{`
+        .markdown-content :where(p, ul, ol, li) {
+          margin: 0.5rem 0;
+          color: rgba(255, 255, 255, 0.85);
+        }
+        .markdown-content strong {
+          font-weight: bold;
+          color: white;
+        }
+        .markdown-content em {
+          font-style: italic;
+        }
+        .markdown-content code {
+          background: rgba(229, 228, 226, 0.1);
+          padding: 0.2rem 0.4rem;
+          border-radius: 4px;
+          color: white;
+        }
+      `}</style>
     </article>
   );
 };

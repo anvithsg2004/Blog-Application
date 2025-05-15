@@ -1,91 +1,125 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useContext } from 'react';
 import CommentForm from './CommentForm';
 import CommentItem from './CommentItem';
 import { v4 as uuidv4 } from 'uuid';
+import apiFetch from '../components/utils/api';
+import { AuthContext } from '../components/AuthContext';
+import { useNavigate } from 'react-router-dom';
 
 const CommentSection = ({ blogId }) => {
-    const [comments, setComments] = useState([
-        {
-            id: '1',
-            content: 'This article brilliantly explores the tension between brutalist design principles and modern UI expectations.',
-            author: 'Jane Cooper',
-            date: 'May 1, 2025',
-            replies: [
-                {
-                    id: '1-reply-1',
-                    content: 'I agree! The concept of "digital honesty" described here reminds me of architectural brutalism\'s ethical dimensions.',
-                    author: 'Robert Chen',
-                    date: 'May 2, 2025',
-                }
-            ]
-        },
-        {
-            id: '2',
-            content: 'I\'ve been implementing some of these brutalist principles in my recent projects. The user feedback has been surprisingly positive!',
-            author: 'Marcus Johnson',
-            date: 'Apr 27, 2025',
-            replies: []
-        }
-    ]);
+    const [comments, setComments] = useState([]);
+    const { isLoggedIn } = useContext(AuthContext);
+    const navigate = useNavigate();
 
-    const handleAddComment = (content) => {
-        const newComment = {
-            id: uuidv4(),
-            content,
-            author: 'Guest User', // In a real app, get the user's name from auth
-            date: new Date().toLocaleDateString('en-US', {
-                month: 'short',
-                day: 'numeric',
-                year: 'numeric'
-            }),
-            replies: []
+    // Fetch comments when component mounts
+    useEffect(() => {
+        const fetchComments = async () => {
+            try {
+                const response = await apiFetch(`/api/blogs/${blogId}`, {
+                    method: 'GET',
+                    headers: {
+                        'Authorization': `Basic ${localStorage.getItem('authCredentials')}`,
+                    },
+                });
+                if (!response.ok) {
+                    throw new Error('Failed to fetch comments');
+                }
+                const data = await response.json();
+                setComments(data.comments || []);
+            } catch (error) {
+                console.error('Error fetching comments:', error);
+            }
         };
 
-        setComments([...comments, newComment]);
-    };
+        fetchComments();
+    }, [blogId]);
 
-    const handleAddReply = (commentId, content) => {
-        const updatedComments = comments.map(comment => {
-            if (comment.id === commentId) {
-                return {
-                    ...comment,
-                    replies: [
-                        ...comment.replies,
-                        {
-                            id: uuidv4(),
-                            content,
-                            author: 'Guest User', // In a real app, get the user's name from auth
-                            date: new Date().toLocaleDateString('en-US', {
-                                month: 'short',
-                                day: 'numeric',
-                                year: 'numeric'
-                            })
-                        }
-                    ]
-                };
+    const handleAddComment = async (content) => {
+        if (!isLoggedIn) {
+            localStorage.setItem('redirectAfterLogin', `/blogs/${blogId}`);
+            navigate('/login');
+            return;
+        }
+
+        try {
+            const response = await apiFetch(`/api/blogs/${blogId}/comments`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Basic ${localStorage.getItem('authCredentials')}`,
+                },
+                body: JSON.stringify({ content }),
+            });
+            if (!response.ok) {
+                throw new Error('Failed to add comment');
             }
-            return comment;
-        });
-
-        setComments(updatedComments);
+            const updatedBlog = await response.json();
+            setComments(updatedBlog.comments || []);
+        } catch (error) {
+            console.error('Error adding comment:', error);
+        }
     };
 
-    const handleDeleteComment = (commentId) => {
-        const updatedComments = comments.filter(comment => comment.id !== commentId);
-        setComments(updatedComments);
-    };
+    const handleAddReply = async (commentId, content) => {
+        if (!isLoggedIn) {
+            localStorage.setItem('redirectAfterLogin', `/blogs/${blogId}`);
+            navigate('/login');
+            return;
+        }
 
-    const handleDeleteReply = (commentId, replyId) => {
-        const updatedComments = comments.map(comment => {
-            if (comment.id === commentId) {
-                return {
-                    ...comment,
-                    replies: comment.replies.filter(reply => reply.id !== replyId)
-                };
+        try {
+            const response = await apiFetch(`/api/blogs/${blogId}/comments/${commentId}/replies`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Basic ${localStorage.getItem('authCredentials')}`,
+                },
+                body: JSON.stringify({ content }),
+            });
+            if (!response.ok) {
+                throw new Error('Failed to add reply');
             }
-            return comment;
-        });
-        setComments(updatedComments);
+            const updatedBlog = await response.json();
+            setComments(updatedBlog.comments || []);
+        } catch (error) {
+            console.error('Error adding reply:', error);
+        }
+    };
+
+    const handleDeleteComment = async (commentId) => {
+        try {
+            const response = await apiFetch(`/api/blogs/${blogId}/comments/${commentId}`, {
+                method: 'DELETE',
+                headers: {
+                    'Authorization': `Basic ${localStorage.getItem('authCredentials')}`,
+                },
+            });
+            if (!response.ok) {
+                throw new Error('Failed to delete comment');
+            }
+            const updatedBlog = await response.json();
+            setComments(updatedBlog.comments || []);
+        } catch (error) {
+            console.error('Error deleting comment:', error);
+        }
+    };
+
+    const handleDeleteReply = async (commentId, replyId) => {
+        try {
+            const response = await apiFetch(`/api/blogs/${blogId}/comments/${commentId}/replies/${replyId}`, {
+                method: 'DELETE',
+                headers: {
+                    'Authorization': `Basic ${localStorage.getItem('authCredentials')}`,
+                },
+            });
+            if (!response.ok) {
+                throw new Error('Failed to delete reply');
+            }
+            const updatedBlog = await response.json();
+            setComments(updatedBlog.comments || []);
+        } catch (error) {
+            console.error('Error deleting reply:', error);
+        }
     };
 
     return (

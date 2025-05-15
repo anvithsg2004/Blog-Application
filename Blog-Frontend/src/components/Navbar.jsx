@@ -1,14 +1,18 @@
-import React, { useState, useContext, useEffect } from "react";
+import React, { useState, useContext, useEffect, useRef } from "react";
 import { Link, useNavigate, useLocation } from "react-router-dom";
-import { Menu, X, LogOut } from "lucide-react";
+import { Menu, X, LogOut, Bell } from "lucide-react";
 import { Button } from "./ui/button";
 import UserAvatar from "./UserAvatar";
 import { AuthContext } from "../components/AuthContext";
+import apiFetch from "../components/utils/api";
 
 const Navbar = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [notifications, setNotifications] = useState([]);
+  const [isNotificationDropdownOpen, setIsNotificationDropdownOpen] = useState(false);
   const navigate = useNavigate();
   const location = useLocation();
+  const dropdownRef = useRef(null);
   const { isLoggedIn, user, loading, logout } = useContext(AuthContext) || {
     isLoggedIn: false,
     user: null,
@@ -16,6 +20,43 @@ const Navbar = () => {
     logout: () => { },
   };
 
+  // Fetch all notifications
+  useEffect(() => {
+    if (isLoggedIn && !loading) {
+      const fetchNotifications = async () => {
+        try {
+          const response = await apiFetch("/api/notifications", {
+            method: "GET",
+            headers: {
+              Authorization: `Basic ${localStorage.getItem("authCredentials")}`,
+            },
+          });
+          if (response.ok) {
+            const data = await response.json();
+            setNotifications(data);
+          } else {
+            console.error("Failed to fetch notifications");
+          }
+        } catch (error) {
+          console.error("Error fetching notifications:", error);
+        }
+      };
+      fetchNotifications();
+    }
+  }, [isLoggedIn, loading]);
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
+        setIsNotificationDropdownOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  // Log state changes
   useEffect(() => {
     console.log("Navbar: isLoggedIn changed to", isLoggedIn, "user:", user);
   }, [isLoggedIn, user]);
@@ -28,7 +69,7 @@ const Navbar = () => {
     console.log("handleProfileClick: isLoggedIn:", isLoggedIn, "user:", user, "loading:", loading);
     if (loading) {
       console.log("handleProfileClick: Still loading, delaying navigation");
-      return; // Wait until loading is complete
+      return;
     }
     if (isLoggedIn && user) {
       console.log("Navigating to /profile");
@@ -44,6 +85,32 @@ const Navbar = () => {
     logout();
     navigate("/login");
     setIsMenuOpen(false);
+  };
+
+  const handleNotificationClick = () => {
+    setIsNotificationDropdownOpen(!isNotificationDropdownOpen);
+    setIsMenuOpen(false);
+  };
+
+  const handleNotificationItemClick = async (notification) => {
+    try {
+      // Mark the specific notification as read
+      const response = await apiFetch(`/api/notifications/${notification.id}/mark-read`, {
+        method: "POST",
+        headers: {
+          Authorization: `Basic ${localStorage.getItem("authCredentials")}`,
+        },
+      });
+      if (response.ok) {
+        setNotifications((prev) =>
+          prev.map((n) => (n.id === notification.id ? { ...n, isRead: true } : n))
+        );
+      }
+      navigate(`/blog/${notification.blogId}`);
+      setIsNotificationDropdownOpen(false);
+    } catch (error) {
+      console.error("Error marking notification as read:", error);
+    }
   };
 
   if (loading) {
@@ -68,6 +135,11 @@ const Navbar = () => {
               userImage={user?.photo ? `data:image/jpeg;base64,${user.photo}` : null}
               onProfileClick={handleProfileClick}
               onLogout={handleLogout}
+              notifications={notifications}
+              onNotificationClick={handleNotificationClick}
+              isNotificationDropdownOpen={isNotificationDropdownOpen}
+              onNotificationItemClick={handleNotificationItemClick}
+              dropdownRef={dropdownRef}
             />
           ) : (
             <AuthButtons />
@@ -111,6 +183,38 @@ const Navbar = () => {
               <div className="pt-8 border-t border-[rgba(229,228,226,0.3)]">
                 {isLoggedIn ? (
                   <div className="flex flex-col gap-4">
+                    <div>
+                      <button
+                        onClick={handleNotificationClick}
+                        className="flex items-center gap-2 text-white text-xl font-['Space_Grotesk'] font-bold no-underline bg-transparent border-none cursor-pointer transition-brutal hover:text-[#E5E4E2]"
+                      >
+                        <Bell size={20} />
+                        NOTIFICATIONS ({notifications.length})
+                      </button>
+                      {isNotificationDropdownOpen && (
+                        <div className="mt-2 bg-black border border-[rgba(229,228,226,0.3)] p-4 max-h-96 overflow-y-auto">
+                          {notifications.length === 0 ? (
+                            <p className="text-gray-400">No notifications available.</p>
+                          ) : (
+                            notifications.map((notification) => (
+                              <div
+                                key={notification.id}
+                                onClick={() => handleNotificationItemClick(notification)}
+                                className={`p-2 cursor-pointer hover:bg-[rgba(229,228,226,0.1)] ${notification.isRead ? "opacity-50" : ""
+                                  }`}
+                              >
+                                <p className="text-white font-['Space_Grotesk']">
+                                  <strong>{notification.blogTitle}</strong> by {notification.authorEmail}
+                                </p>
+                                <p className="text-sm text-gray-400">
+                                  {new Date(notification.createdAt).toLocaleString()}
+                                </p>
+                              </div>
+                            ))
+                          )}
+                        </div>
+                      )}
+                    </div>
                     <div className="flex items-center gap-4">
                       <UserAvatar
                         userImage={user?.photo ? `data:image/jpeg;base64,${user.photo}` : null}
@@ -150,7 +254,7 @@ const NavLinks = ({ vertical = false, isLoggedIn = false }) => {
   const links = [
     { name: "HOME", path: "/" },
     { name: "BLOGS", path: "/blogs" },
-    ...(isLoggedIn ? [] : [{ name: "WRITE", path: "/write-blog" }]), // Exclude "Write" when logged in
+    ...(isLoggedIn ? [] : [{ name: "WRITE", path: "/write-blog" }]),
   ];
 
   return (
@@ -159,8 +263,8 @@ const NavLinks = ({ vertical = false, isLoggedIn = false }) => {
         <Link
           key={link.path}
           to={link.path}
-          className={`${vertical ? "text-xl py-2" : "text-xs uppercase tracking-[1px]"
-            } text-white no-underline transition-brutal hover:text-[#E5E4E2] ${!vertical ? "hover:-translate-y-0.5" : ""}`}
+          className={`${vertical ? "text-xl py-2" : "text-xs uppercase tracking-[1px]"} text-white no-underline transition-brutal hover:text-[#E5E4E2] ${!vertical ? "hover:-translate-y-0.5" : ""
+            }`}
         >
           {link.name}
         </Link>
@@ -169,7 +273,16 @@ const NavLinks = ({ vertical = false, isLoggedIn = false }) => {
   );
 };
 
-const UserControls = ({ userImage, onProfileClick, onLogout }) => (
+const UserControls = ({
+  userImage,
+  onProfileClick,
+  onLogout,
+  notifications,
+  onNotificationClick,
+  isNotificationDropdownOpen,
+  onNotificationItemClick,
+  dropdownRef,
+}) => (
   <div className="flex items-center gap-4">
     <Link
       to="/write-blog"
@@ -177,6 +290,42 @@ const UserControls = ({ userImage, onProfileClick, onLogout }) => (
     >
       WRITE
     </Link>
+    <div className="relative" ref={dropdownRef}>
+      <button
+        onClick={onNotificationClick}
+        className="relative text-white transition-brutal hover:text-[#E5E4E2] hover:-translate-y-0.5"
+      >
+        <Bell size={20} />
+        {notifications.filter((n) => !n.isRead).length > 0 && (
+          <span className="absolute -top-2 -right-2 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
+            {notifications.filter((n) => !n.isRead).length}
+          </span>
+        )}
+      </button>
+      {isNotificationDropdownOpen && (
+        <div className="absolute right-0 mt-2 w-80 bg-black border border-[rgba(229,228,226,0.3)] shadow-lg z-50 max-h-96 overflow-y-auto">
+          {notifications.length === 0 ? (
+            <div className="p-4 text-gray-400">No notifications available.</div>
+          ) : (
+            notifications.map((notification) => (
+              <div
+                key={notification.id}
+                onClick={() => onNotificationItemClick(notification)}
+                className={`p-4 cursor-pointer hover:bg-[rgba(229,228,226,0.1)] ${notification.isRead ? "opacity-50" : ""
+                  }`}
+              >
+                <p className="text-white font-['Space_Grotesk']">
+                  <strong>{notification.blogTitle}</strong> by {notification.authorEmail}
+                </p>
+                <p className="text-sm text-gray-400">
+                  {new Date(notification.createdAt).toLocaleString()}
+                </p>
+              </div>
+            ))
+          )}
+        </div>
+      )}
+    </div>
     <UserAvatar userImage={userImage} onClick={onProfileClick} />
     <button
       onClick={onLogout}

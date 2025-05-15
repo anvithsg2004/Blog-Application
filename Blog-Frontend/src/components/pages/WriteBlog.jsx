@@ -11,6 +11,8 @@ import {
 } from "@/components/ui/select";
 import { AuthContext } from "../AuthContext";
 import { useNavigate } from "react-router-dom";
+import { marked } from "marked";
+import DOMPurify from "dompurify";
 import apiFetch from "../utils/api";
 
 const WriteBlog = () => {
@@ -24,10 +26,12 @@ const WriteBlog = () => {
   const [selectedFile, setSelectedFile] = useState(null);
   const [previewUrl, setPreviewUrl] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [isPreview, setIsPreview] = useState(false);
 
   useEffect(() => {
     if (!isLoggedIn) {
       console.log("WriteBlog: User not logged in, redirecting to /login");
+      localStorage.setItem("redirectAfterLogin", "/write-blog");
       navigate("/login");
     }
   }, [isLoggedIn, navigate]);
@@ -37,7 +41,6 @@ const WriteBlog = () => {
       const file = e.target.files[0];
       setSelectedFile(file);
 
-      // Create a preview URL
       const fileReader = new FileReader();
       fileReader.onload = () => {
         if (fileReader.result) {
@@ -58,7 +61,6 @@ const WriteBlog = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    // Validate form
     if (!title) {
       toast({
         title: "Title is required",
@@ -77,26 +79,40 @@ const WriteBlog = () => {
       return;
     }
 
+    if (selectedFile && selectedFile.size > 10 * 1024 * 1024) {
+      toast({
+        title: "Image too large",
+        description: "Please upload an image smaller than 10MB.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     setLoading(true);
 
     try {
-      // Prepare form data for multipart request
       const formData = new FormData();
       formData.append("title", title);
       formData.append("content", blogContent);
 
-      // Include code snippet if provided
       if (codeContent.trim()) {
+        if (!language) {
+          toast({
+            title: "Language required",
+            description: "Please select a language for your code snippet.",
+            variant: "destructive",
+          });
+          setLoading(false);
+          return;
+        }
         formData.append("language", language);
         formData.append("code", codeContent);
       }
 
-      // Include featured image if selected
       if (selectedFile) {
         formData.append("image", selectedFile);
       }
 
-      // Make API call to create blog post
       const response = await apiFetch("/api/blogs", {
         method: "POST",
         body: formData,
@@ -111,21 +127,27 @@ const WriteBlog = () => {
         variant: "success",
       });
 
-      // Reset form
       setTitle("");
       setBlogContent("");
       setCodeContent("");
       setLanguage("javascript");
       setSelectedFile(null);
       setPreviewUrl(null);
+      setIsPreview(false);
 
-      // Navigate to user profile
       navigate("/profile");
     } catch (error) {
       console.error("Failed to create blog:", error);
+      let errorMessage = "Failed to create blog post.";
+      if (error.message.includes("401")) {
+        errorMessage = "Unauthorized. Please log in again.";
+        navigate("/login");
+      } else if (error.message.includes("413")) {
+        errorMessage = "Image too large. Please upload a smaller file.";
+      }
       toast({
         title: "Error",
-        description: error.message || "Failed to create blog post.",
+        description: errorMessage,
         variant: "destructive",
       });
     } finally {
@@ -133,16 +155,20 @@ const WriteBlog = () => {
     }
   };
 
+  // Parse and sanitize Markdown for preview
+  const markdownContent = marked(blogContent || "No content entered");
+  const sanitizedContent = DOMPurify.sanitize(markdownContent);
+
   return (
     <div className="pt-20 min-h-screen bg-black">
-      <div className="max-w-7xl mx-auto py-16">
+      <div className="max-w-7xl mx-auto py-16 px-4 sm:px-6 lg:px-8">
         <div className="mb-12">
           <h1 className="text-4xl md:text-5xl font-['Space_Grotesk'] font-bold tracking-[-1px] text-white">
             CREATE NEW BLOG
           </h1>
           <p className="text-[rgba(229,228,226,0.8)] mt-4 max-w-4xl">
             Share your knowledge, insights and expertise with our community.
-            Write about tech, design, or any topic you're passionate about.
+            Write about tech, design, or any topic you're passionate about. Use Markdown for formatting (e.g., ## for headings, ** for bold).
           </p>
         </div>
 
@@ -162,15 +188,34 @@ const WriteBlog = () => {
 
           {/* Blog Content */}
           <div className="grid gap-2">
-            <label className="uppercase text-xs tracking-[1px] text-[#E5E4E2]">Blog Content</label>
-            <textarea
-              id="blogContent"
-              value={blogContent}
-              onChange={(e) => setBlogContent(e.target.value)}
-              className="min-h-[300px] p-6 bg-black border border-[rgba(229,228,226,0.5)] font-['Inter'] text-lg leading-relaxed outline-none inset-shadow transition-brutal"
-              placeholder="Start writing your blog post here..."
-              disabled={loading}
-            />
+            <div className="flex justify-between items-center">
+              <label className="uppercase text-xs tracking-[1px] text-[#E5E4E2]">
+                Blog Content
+              </label>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setIsPreview(!isPreview)}
+                disabled={loading}
+              >
+                {isPreview ? "Edit" : "Preview"}
+              </Button>
+            </div>
+            {isPreview ? (
+              <div
+                className="min-h-[300px] p-6 bg-black border border-[rgba(229,228,226,0.5)] text-lg leading-relaxed markdown-content"
+                dangerouslySetInnerHTML={{ __html: sanitizedContent }}
+              />
+            ) : (
+              <textarea
+                id="blogContent"
+                value={blogContent}
+                onChange={(e) => setBlogContent(e.target.value)}
+                className="min-h-[300px] p-6 bg-black border border-[rgba(229,228,226,0.5)] font-['Inter'] text-lg leading-relaxed outline-none inset-shadow transition-brutal"
+                placeholder="Start writing your blog post here... Use Markdown for formatting (e.g., ## for headings, ** for bold)"
+                disabled={loading}
+              />
+            )}
           </div>
 
           {/* Language Selection */}
@@ -278,6 +323,41 @@ const WriteBlog = () => {
           </div>
         </form>
       </div>
+
+      <style jsx>{`
+        .markdown-content :where(h1, h2, h3, h4, h5, h6) {
+          font-family: "Space Grotesk", sans-serif;
+          font-weight: bold;
+          color: white;
+          margin: 1rem 0;
+        }
+        .markdown-content h1 { font-size: 2.25rem; }
+        .markdown-content h2 { font-size: 1.875rem; }
+        .markdown-content h3 { font-size: 1.5rem; }
+        .markdown-content p {
+          margin: 0.5rem 0;
+          color: rgba(255, 255, 255, 0.85);
+        }
+        .markdown-content ul,
+        .markdown-content ol {
+          margin: 0.5rem 0;
+          padding-left: 2rem;
+          color: rgba(255, 255, 255, 0.85);
+        }
+        .markdown-content strong {
+          font-weight: bold;
+          color: white;
+        }
+        .markdown-content em {
+          font-style: italic;
+        }
+        .markdown-content code {
+          background: rgba(229, 228, 226, 0.1);
+          padding: 0.2rem 0.4rem;
+          border-radius: 4px;
+          color: white;
+        }
+      `}</style>
     </div>
   );
 };

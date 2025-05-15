@@ -20,14 +20,25 @@ const Home = () => {
         const response = await apiFetch("/api/blogs", {
           method: "GET",
         });
+
+        if (!response.ok) {
+          throw new Error("Failed to fetch blogs");
+        }
+
         const blogs = await response.json();
+        console.log("Fetched blogs:", blogs);
 
         const formattedBlogs = blogs.map(blog => ({
           id: blog.id,
           title: blog.title,
-          excerpt: blog.content.split("\n")[0].substring(0, 100) + "...",
-          imageUrl: blog.image || "https://images.pexels.com/photos/3861969/pexels-photo-3861969.jpeg",
-          authorName: blog.authorEmail.split("@")[0], // Simplified for display
+          // Take first 100 characters, preserving line breaks
+          excerpt: blog.content.length > 100
+            ? blog.content.substring(0, 100) + "..."
+            : blog.content,
+          imageUrl: blog.image
+            ? `data:image/jpeg;base64,${blog.image}`
+            : "https://images.pexels.com/photos/3861969/pexels-photo-3861969.jpeg",
+          authorName: blog.authorEmail ? blog.authorEmail.split("@")[0] : "Unknown",
           date: new Date(blog.createdAt).toLocaleDateString("en-US", {
             month: "short",
             day: "numeric",
@@ -38,7 +49,6 @@ const Home = () => {
         setAllBlogs(formattedBlogs);
         setDisplayedBlogs(formattedBlogs);
 
-        // Set the first blog as the featured blog (or implement your own logic)
         if (formattedBlogs.length > 0) {
           setFeaturedBlog(formattedBlogs[0]);
         }

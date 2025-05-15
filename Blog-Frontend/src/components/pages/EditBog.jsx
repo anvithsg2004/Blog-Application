@@ -3,6 +3,7 @@ import { useParams, useNavigate } from "react-router-dom";
 import { ArrowLeft, Save } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
+import apiFetch from "../utils/api";
 
 const EditBlog = () => {
     const { id } = useParams();
@@ -12,6 +13,7 @@ const EditBlog = () => {
     const [isLoading, setIsLoading] = useState(true);
     const [blogContent, setBlogContent] = useState("");
     const [codeContent, setCodeContent] = useState("");
+    const [codeLanguage, setCodeLanguage] = useState("");
     const [title, setTitle] = useState("");
     const [currentImage, setCurrentImage] = useState(null);
     const [selectedFile, setSelectedFile] = useState(null);
@@ -19,36 +21,30 @@ const EditBlog = () => {
 
     // Fetch blog data
     useEffect(() => {
-        // Simulate API call to fetch blog data
         const fetchBlog = async () => {
             setIsLoading(true);
-
             try {
-                // This would be a real API call in production
-                // Mock data for demonstration
-                const blog = {
-                    id: id,
-                    title: "The Future of Brutalist Design in Digital Spaces",
-                    content: `Brutalist design, with its raw and uncompromising aesthetic, has found new life in the digital realm. 
-          This renaissance challenges conventional web design paradigms, offering a bold alternative to the 
-          homogenized interfaces we've grown accustomed to.
-
-          The principles of brutalism - honesty in materials, exposed structure, and functional design - translate 
-          surprisingly well to digital interfaces. In web design, this manifests as exposed HTML elements, 
-          system fonts, and a departure from skeuomorphic design patterns.
-
-          This approach isn't merely aesthetic rebellion; it's a response to users' growing sophistication and 
-          desire for authentic digital experiences. By stripping away unnecessary ornamentation, brutalist 
-          design focuses attention on content and functionality.`,
-                    codeContent: "// Example code\nconst brutalism = {\n  exposed: true,\n  honest: true,\n  functional: true\n};",
-                    imageUrl: "https://images.pexels.com/photos/1779487/pexels-photo-1779487.jpeg",
-                };
-
-                setTitle(blog.title);
-                setBlogContent(blog.content);
-                setCodeContent(blog.codeContent || "");
-                setCurrentImage(blog.imageUrl);
-                setPreviewUrl(blog.imageUrl);
+                const response = await apiFetch(`/api/blogs/${id}`, {
+                    method: "GET",
+                    headers: {
+                        Authorization: `Basic ${localStorage.getItem("authCredentials")}`,
+                    },
+                });
+                if (!response.ok) {
+                    if (response.status === 401) {
+                        localStorage.setItem("redirectAfterLogin", `/blogs/edit/${id}`);
+                        navigate("/login");
+                        return;
+                    }
+                    throw new Error("Failed to fetch blog");
+                }
+                const data = await response.json();
+                setTitle(data.title);
+                setBlogContent(data.content);
+                setCodeContent(data.codeSnippet || "");
+                setCodeLanguage(data.codeLanguage || "");
+                setCurrentImage(data.image ? `data:image/jpeg;base64,${data.image}` : null);
+                setPreviewUrl(data.image ? `data:image/jpeg;base64,${data.image}` : null);
             } catch (error) {
                 console.error("Failed to fetch blog:", error);
                 toast({
@@ -62,7 +58,7 @@ const EditBlog = () => {
         };
 
         fetchBlog();
-    }, [id, toast]);
+    }, [id, navigate, toast]);
 
     const handleFileChange = (e) => {
         if (e.target.files && e.target.files[0]) {
@@ -84,7 +80,7 @@ const EditBlog = () => {
         navigate(-1);
     };
 
-    const handleSubmit = (e) => {
+    const handleSubmit = async (e) => {
         e.preventDefault();
 
         // Validate form
@@ -108,17 +104,35 @@ const EditBlog = () => {
 
         setIsLoading(true);
 
-        // Simulate API call to update blog
-        setTimeout(() => {
-            console.log("Updating blog:", {
-                id,
-                title,
-                blogContent,
-                codeContent,
-                image: selectedFile ? "New file uploaded" : currentImage
+        try {
+            const formData = new FormData();
+            formData.append("id", id);
+            formData.append("title", title);
+            formData.append("content", blogContent);
+            if (codeContent) {
+                formData.append("code", codeContent);
+                formData.append("language", codeLanguage || "javascript");
+            }
+            if (selectedFile) {
+                formData.append("image", selectedFile);
+            }
+
+            const response = await apiFetch("/api/blogs", {
+                method: "PUT",
+                headers: {
+                    Authorization: `Basic ${localStorage.getItem("authCredentials")}`,
+                },
+                body: formData,
             });
 
-            setIsLoading(false);
+            if (!response.ok) {
+                if (response.status === 401) {
+                    localStorage.setItem("redirectAfterLogin", `/blogs/edit/${id}`);
+                    navigate("/login");
+                    return;
+                }
+                throw new Error("Failed to update blog");
+            }
 
             toast({
                 title: "Blog updated successfully!",
@@ -126,7 +140,16 @@ const EditBlog = () => {
             });
 
             navigate("/profile");
-        }, 1500);
+        } catch (error) {
+            console.error("Error updating blog:", error);
+            toast({
+                title: "Error updating blog",
+                description: "Could not save your changes. Please try again.",
+                variant: "destructive",
+            });
+        } finally {
+            setIsLoading(false);
+        }
     };
 
     if (isLoading) {
@@ -174,6 +197,18 @@ const EditBlog = () => {
                             onChange={(e) => setBlogContent(e.target.value)}
                             className="min-h-[300px] p-6 bg-black border border-[rgba(229,228,226,0.5)] font-['Inter'] text-lg leading-relaxed outline-none inset-shadow transition-brutal"
                             placeholder="Start writing your blog post here..."
+                        />
+                    </div>
+
+                    {/* Code Language */}
+                    <div className="grid gap-2">
+                        <label className="uppercase text-xs tracking-[1px] text-[#E5E4E2]">Code Language (Optional)</label>
+                        <input
+                            id="codeLanguage"
+                            value={codeLanguage}
+                            onChange={(e) => setCodeLanguage(e.target.value)}
+                            className="p-4 border-4 border-white bg-black text-xl font-['Space_Grotesk'] focus:border-[#E5E4E2] outline-none transition-brutal"
+                            placeholder="e.g., javascript, python"
                         />
                     </div>
 

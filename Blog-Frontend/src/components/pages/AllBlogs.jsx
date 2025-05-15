@@ -1,34 +1,50 @@
-import React from "react";
+import React, { useState, useEffect } from "react";
 import BlogCard from '../BlogCard';
+import apiFetch from "../utils/api";
 
 const AllBlogs = () => {
-    // Mock blogs data - replace with actual data fetching
-    const blogs = [
-        {
-            id: "1",
-            title: "Monochromatic Design Systems: Less Is More",
-            excerpt: "Why limiting your color palette can lead to more coherent, impactful designs that stand the test of time and strengthen brand identity.",
-            imageUrl: "https://images.pexels.com/photos/3861969/pexels-photo-3861969.jpeg",
-            authorName: "Sarah Johnson",
-            date: "APR 23, 2025",
-        },
-        {
-            id: "2",
-            title: "Typography as Architecture: Building with Fonts",
-            excerpt: "How thoughtful typography choices serve as the structural foundation of your design, creating hierarchy, flow, and visual impact.",
-            imageUrl: "https://images.pexels.com/photos/3585090/pexels-photo-3585090.jpeg",
-            authorName: "David Chen",
-            date: "APR 20, 2025",
-        },
-        {
-            id: "3",
-            title: "Neuomorphic UIs: The Evolution of Skeuomorphism",
-            excerpt: "Exploring how neuomorphic design brings subtle dimension to flat interfaces, creating a tactile experience in digital environments.",
-            imageUrl: "https://images.pexels.com/photos/1181271/pexels-photo-1181271.jpeg",
-            authorName: "Michelle Park",
-            date: "APR 18, 2025",
-        },
-    ];
+    const [blogs, setBlogs] = useState([]);
+    const [loading, setLoading] = useState(true);
+
+    useEffect(() => {
+        const fetchBlogs = async () => {
+            try {
+                const response = await apiFetch("/api/blogs", {
+                    method: "GET",
+                });
+                if (!response.ok) {
+                    throw new Error("Failed to fetch blogs");
+                }
+                const data = await response.json();
+                setBlogs(data.map(blog => ({
+                    id: blog.id,
+                    title: blog.title,
+                    excerpt: blog.content.substring(0, 150) + "...",
+                    imageUrl: blog.image ? `data:image/jpeg;base64,${blog.image}` : null,
+                    authorName: blog.authorEmail, // Will be updated later
+                    date: new Date(blog.createdAt).toLocaleDateString('en-US', {
+                        month: 'short',
+                        day: 'numeric',
+                        year: 'numeric'
+                    }).toUpperCase(),
+                })));
+                setLoading(false);
+            } catch (error) {
+                console.error("Error fetching blogs:", error);
+                setLoading(false);
+            }
+        };
+
+        fetchBlogs();
+    }, []);
+
+    if (loading) {
+        return (
+            <div className="pt-20 min-h-screen bg-black flex items-center justify-center">
+                <div className="w-16 h-16 border-4 border-t-white border-r-white/30 border-b-white/10 border-l-white/60 rounded-full animate-spin"></div>
+            </div>
+        );
+    }
 
     return (
         <div className="pt-20 min-h-screen bg-black">

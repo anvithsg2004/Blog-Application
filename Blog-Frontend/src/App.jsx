@@ -2,7 +2,8 @@ import { Toaster } from './components/ui/toaster';
 import { Toaster as Sonner } from "./components/ui/sonner";
 import { TooltipProvider } from "./components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Routes, Route, useLocation } from "react-router-dom";
+import { useEffect } from "react";
 
 import Home from './components/pages/Home';
 import Login from './components/pages/Login';
@@ -18,16 +19,33 @@ import BlogDetail from './components/pages/BlogDetail';
 import LinkNotAvailable from './components/pages/LinkNotAvailable';
 import EditBlog from './components/pages/EditBog';
 import { AuthProvider } from "./components/AuthContext";
+import Unsubscribe from './components/Unsubscribe';
+import UnsubscribeGeneral from "./components/UnsubscribeGeneral";
 
 import './App.css';
 
 const queryClient = new QueryClient();
+
+const ScrollRestoration = () => {
+  const { pathname } = useLocation();
+
+  useEffect(() => {
+    window.history.scrollRestoration = "manual";
+    window.scrollTo({
+      top: 0,
+      behavior: "instant",
+    });
+  }, [pathname]);
+
+  return null;
+};
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <TooltipProvider>
       <AuthProvider>
         <BrowserRouter>
+          <ScrollRestoration />
           <div className="flex flex-col min-h-screen">
             <Navbar />
             <main className="flex-1">
@@ -43,6 +61,8 @@ const App = () => (
                 <Route path="/link-not-available" element={<LinkNotAvailable />} />
                 <Route path="/otp-verification" element={<OTPVerification />} />
                 <Route path="/edit-blog/:id" element={<EditBlog />} />
+                <Route path="/unsubscribe" element={<Unsubscribe />} />
+                <Route path="/unsubscribe/general" element={<UnsubscribeGeneral />} />
                 <Route path="*" element={<NotFound />} />
               </Routes>
             </main>

@@ -2,6 +2,7 @@ package com.blog.Blog_Backend.service;
 
 import com.blog.Blog_Backend.entity.BlogPost;
 import com.blog.Blog_Backend.entity.Comment;
+import com.blog.Blog_Backend.entity.User;
 import com.blog.Blog_Backend.repository.BlogPostRepository;
 import com.blog.Blog_Backend.utility.SecurityUtils;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -9,6 +10,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
@@ -17,6 +19,9 @@ public class BlogPostService {
 
     @Autowired
     private BlogPostRepository repo;
+
+    @Autowired
+    private UserService userService;
 
     /**
      * Create a new blog for the given user email.
@@ -32,7 +37,7 @@ public class BlogPostService {
 
     /**
      * Update an existing blog by user email.
-     * Only title, content, codeLanguage, and codeSnippet are replaced.
+     * Only title, content, codeLanguage, codeSnippet, and image are replaced.
      */
     public BlogPost updateBlog(String email, BlogPost updates) {
         String currentUserEmail = SecurityUtils.getCurrentUserEmail();
@@ -51,6 +56,9 @@ public class BlogPostService {
         existing.setContent(updates.getContent());
         existing.setCodeLanguage(updates.getCodeLanguage());
         existing.setCodeSnippet(updates.getCodeSnippet());
+        if (updates.getImage() != null) {
+            existing.setImage(updates.getImage());
+        }
         // Preserve existing comments
         if (updates.getComments() != null) {
             existing.setComments(updates.getComments());
@@ -69,10 +77,33 @@ public class BlogPostService {
      * Get a blog by its ID.
      */
     public BlogPost getBlogById(String blogId) {
-        return repo.findById(blogId)
+        BlogPost blog = repo.findById(blogId)
                 .orElseThrow(() ->
                         new ResponseStatusException(HttpStatus.NOT_FOUND, "Blog not found")
                 );
+        // Transform comments to replace authorEmail with authorName
+        blog.setComments(transformComments(blog.getComments()));
+        return blog;
+    }
+
+    /**
+     * Transform comments to replace authorEmail with authorName
+     */
+    private List<Comment> transformComments(List<Comment> comments) {
+        List<Comment> transformed = new ArrayList<>();
+        for (Comment comment : comments) {
+            Comment transformedComment = new Comment();
+            transformedComment.setId(comment.getId());
+            transformedComment.setContent(comment.getContent());
+            // Fetch author name
+            User author = userService.getUserByEmail(comment.getAuthorEmail());
+            transformedComment.setAuthorEmail(author.getName()); // Use name instead of email
+            transformedComment.setCreatedAt(comment.getCreatedAt());
+            // Recursively transform replies
+            transformedComment.setReplies(transformComments(comment.getReplies()));
+            transformed.add(transformedComment); // Changed from push to add
+        }
+        return transformed;
     }
 
     /**
@@ -165,5 +196,59 @@ public class BlogPostService {
             }
         }
         return null;
+    }
+
+    /**
+     * Delete a comment by blog ID and comment ID
+     */
+    public BlogPost deleteComment(String blogId, String commentId, String authorEmail) {
+        String currentUserEmail = SecurityUtils.getCurrentUserEmail();
+        if (currentUserEmail == null || !currentUserEmail.equals(authorEmail)) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "You are not authorized to delete this comment");
+        }
+
+        BlogPost blog = repo.findById(blogId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Blog not found"));
+
+        Comment comment = findCommentById(blog.getComments(), commentId);
+        if (comment == null) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Comment not found");
+        }
+        if (!comment.getAuthorEmail().equals(authorEmail)) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "You are not authorized to delete this comment");
+        }
+
+        blog.getComments().removeIf(c -> c.getId().equals(commentId));
+        return repo.save(blog);
+    }
+
+    /**
+     * Delete a reply by blog ID, comment ID, and reply ID
+     */
+    public BlogPost deleteReply(String blogId, String commentId, String replyId, String authorEmail) {
+        String currentUserEmail = SecurityUtils.getCurrentUserEmail();
+        if (currentUserEmail == null || !currentUserEmail.equals(authorEmail)) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "You are not authorized to delete this reply");
+        }
+
+        BlogPost blog = repo.findById(blogId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Blog not found"));
+
+        Comment parentComment = findCommentById(blog.getComments(), commentId);
+        if (parentComment == null) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Parent comment not found");
+        }
+
+        Comment reply = parentComment.getReplies().stream()
+                .filter(r -> r.getId().equals(replyId))
+                .findFirst()
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Reply not found"));
+
+        if (!reply.getAuthorEmail().equals(authorEmail)) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "You are not authorized to delete this reply");
+        }
+
+        parentComment.getReplies().removeIf(r -> r.getId().equals(replyId));
+        return repo.save(blog);
     }
 }

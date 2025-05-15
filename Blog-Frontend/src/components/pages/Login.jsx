@@ -15,18 +15,20 @@ const Login = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
-
     try {
-      await login(email, password);
+      await login(email, password, () => {
+        const redirectTo = localStorage.getItem("redirectAfterLogin") || "/profile";
+        localStorage.removeItem("redirectAfterLogin");
+        navigate(redirectTo, { replace: true });
+      });
       toast({
-        title: "Login Successful",
-        description: "Welcome back!",
+        title: "Login successful",
+        description: "You are now logged in.",
         variant: "success",
       });
-      navigate("/profile"); // Redirect to home page
     } catch (error) {
       toast({
-        title: "Login Failed",
+        title: "Login failed",
         description: error.message || "Invalid email or password.",
         variant: "destructive",
       });

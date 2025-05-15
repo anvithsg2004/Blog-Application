@@ -33,7 +33,20 @@ const UserProfile = () => {
                 setLoading(true);
                 const response = await apiFetch("/api/users/profile", {
                     method: "GET",
+                    headers: {
+                        Authorization: `Basic ${localStorage.getItem("authCredentials")}`,
+                    },
                 });
+
+                if (!response.ok) {
+                    if (response.status === 401) {
+                        localStorage.setItem("redirectAfterLogin", "/profile");
+                        navigate("/login");
+                        return;
+                    }
+                    throw new Error("Failed to fetch profile data");
+                }
+
                 const data = await response.json();
                 console.log("UserProfile: Fetched user data:", data);
                 const userInfo = data.user;
@@ -48,6 +61,7 @@ const UserProfile = () => {
                     ...userInfo,
                     joinedDate,
                     location: userInfo.location || "Not specified",
+                    photo: userInfo.photo || null,
                 };
 
                 setUserData(formattedUser);
@@ -58,8 +72,9 @@ const UserProfile = () => {
                         id: blog.id,
                         title: blog.title,
                         excerpt: blog.content.split("\n")[0].substring(0, 100) + "...",
-                        imageUrl:
-                            blog.image || "https://images.pexels.com/photos/3861969/pexels-photo-3861969.jpeg",
+                        imageUrl: blog.image
+                            ? `data:image/jpeg;base64,${blog.image}`
+                            : "https://images.pexels.com/photos/3861969/pexels-photo-3861969.jpeg",
                         authorName: userInfo.name,
                         date: new Date(blog.createdAt)
                             .toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
@@ -73,7 +88,6 @@ const UserProfile = () => {
                     description: "Failed to load profile data.",
                     variant: "destructive",
                 });
-                // Do not redirect if isLoggedIn is true
                 if (!isLoggedIn) {
                     console.log("UserProfile: Not logged in after fetch failure, redirecting to /login");
                     navigate("/login");
@@ -121,7 +135,7 @@ const UserProfile = () => {
     const handleRemovePhoto = () => {
         setEditedData({
             ...editedData,
-            photo: "",
+            photo: null,
         });
         setPreviewUrl("");
         setSelectedFile(null);
@@ -129,6 +143,7 @@ const UserProfile = () => {
         toast({
             title: "Photo removed",
             description: "Your profile photo has been removed.",
+            variant: "success",
         });
     };
 
@@ -146,6 +161,10 @@ const UserProfile = () => {
 
             await apiFetch("/api/users/profile", {
                 method: "PUT",
+                headers: {
+                    Authorization: `Basic ${localStorage.getItem("authCredentials")}`,
+                    "Content-Type": "application/json",
+                },
                 body: JSON.stringify(updatedUser),
             });
 
@@ -154,6 +173,9 @@ const UserProfile = () => {
                 formData.append("photo", selectedFile);
                 await apiFetch("/api/users/profile/photo", {
                     method: "PATCH",
+                    headers: {
+                        Authorization: `Basic ${localStorage.getItem("authCredentials")}`,
+                    },
                     body: formData,
                 });
                 toast({
@@ -165,6 +187,9 @@ const UserProfile = () => {
 
             const response = await apiFetch("/api/users/profile", {
                 method: "GET",
+                headers: {
+                    Authorization: `Basic ${localStorage.getItem("authCredentials")}`,
+                },
             });
             const data = await response.json();
             const userInfo = data.user;
@@ -178,6 +203,7 @@ const UserProfile = () => {
                 ...userInfo,
                 joinedDate,
                 location: userInfo.location || "Not specified",
+                photo: userInfo.photo || null,
             };
 
             setUserData(updatedData);
@@ -192,6 +218,7 @@ const UserProfile = () => {
                 variant: "success",
             });
         } catch (error) {
+            console.error("Error updating profile:", error);
             toast({
                 title: "Error",
                 description: "Failed to update profile.",
@@ -203,9 +230,22 @@ const UserProfile = () => {
     const handleDeleteBlog = async (blogId) => {
         if (window.confirm("Are you sure you want to delete this blog post? This action cannot be undone.")) {
             try {
-                await apiFetch(`/api/blogs/${blogId}`, {
+                const response = await apiFetch(`/api/blogs/${blogId}`, {
                     method: "DELETE",
+                    headers: {
+                        Authorization: `Basic ${localStorage.getItem("authCredentials")}`,
+                    },
                 });
+
+                if (!response.ok) {
+                    if (response.status === 401) {
+                        localStorage.setItem("redirectAfterLogin", "/profile");
+                        navigate("/login");
+                        return;
+                    }
+                    throw new Error("Failed to delete blog");
+                }
+
                 setBlogs(blogs.filter((blog) => blog.id !== blogId));
                 toast({
                     title: "Blog deleted",
@@ -213,9 +253,10 @@ const UserProfile = () => {
                     variant: "success",
                 });
             } catch (error) {
+                console.error("Error deleting blog:", error);
                 toast({
                     title: "Error",
-                    description: "Failed to delete blog.",
+                    description: "Failed to delete blog. Please try again.",
                     variant: "destructive",
                 });
             }
@@ -254,8 +295,12 @@ const UserProfile = () => {
                                     {previewUrl ? (
                                         <img
                                             src={previewUrl}
-                                            alt={editedData.name}
+                                            alt={editedData.name || "Profile"}
                                             className="w-48 h-48 object-cover border-2 border-white"
+                                            onError={(e) => {
+                                                e.target.src = "https://images.pexels.com/photos/771742/pexels-photo-771742.jpeg";
+                                                console.error("Failed to load profile image");
+                                            }}
                                         />
                                     ) : (
                                         <div className="w-48 h-48 bg-[rgba(229,228,226,0.1)] border-2 border-white flex items-center justify-center">
@@ -279,9 +324,9 @@ const UserProfile = () => {
                                 </div>
 
                                 <h2 className="text-2xl font-['Space_Grotesk'] font-bold tracking-[-1px] mb-1">
-                                    {editedData.name}
+                                    {editedData.name || "User"}
                                 </h2>
-                                <p className="text-[rgba(229,228,226,0.8)] mb-6">{editedData.email}</p>
+                                <p className="text-[rgba(229,228,226,0.8)] mb-6">{editedData.email || "No email"}</p>
 
                                 {isEditing && (
                                     <div className="w-full grid gap-4 mt-4">
@@ -307,18 +352,14 @@ const UserProfile = () => {
 
                         <div className="flex flex-col border-4 border-white brutal-shadow">
                             <button
-                                className={`p-4 text-left font-['Space_Grotesk'] font-bold text-lg transition-brutal ${activeTab === "info"
-                                    ? "bg-white text-black"
-                                    : "bg-black text-white hover:bg-[rgba(229,228,226,0.1)]"
+                                className={`p-4 text-left font-['Space_Grotesk'] font-bold text-lg transition-brutal ${activeTab === "info" ? "bg-white text-black" : "bg-black text-white hover:bg-[rgba(229,228,226,0.1)]"
                                     }`}
                                 onClick={() => setActiveTab("info")}
                             >
                                 PROFILE INFORMATION
                             </button>
                             <button
-                                className={`p-4 text-left font-['Space_Grotesk'] font-bold text-lg transition-brutal ${activeTab === "blogs"
-                                    ? "bg-white text-black"
-                                    : "bg-black text-white hover:bg-[rgba(229,228,226,0.1)]"
+                                className={`p-4 text-left font-['Space_Grotesk'] font-bold text-lg transition-brutal ${activeTab === "blogs" ? "bg-white text-black" : "bg-black text-white hover:bg-[rgba(229,228,226,0.1)]"
                                     }`}
                                 onClick={() => setActiveTab("blogs")}
                             >
@@ -353,7 +394,7 @@ const UserProfile = () => {
                                 <div className="grid gap-8">
                                     <ProfileField
                                         label="Full Name"
-                                        value={editedData.name}
+                                        value={editedData.name || ""}
                                         name="name"
                                         isEditing={isEditing}
                                         onChange={handleInputChange}
@@ -361,14 +402,14 @@ const UserProfile = () => {
 
                                     <ProfileField
                                         label="Email"
-                                        value={editedData.email}
+                                        value={editedData.email || ""}
                                         isEditing={false}
                                         disabled={true}
                                     />
 
                                     <ProfileField
                                         label="Phone Number"
-                                        value={editedData.phone}
+                                        value={editedData.phone || ""}
                                         name="phone"
                                         isEditing={isEditing}
                                         onChange={handleInputChange}
@@ -376,7 +417,7 @@ const UserProfile = () => {
 
                                     <ProfileField
                                         label="Location"
-                                        value={editedData.location}
+                                        value={editedData.location || "Not specified"}
                                         name="location"
                                         isEditing={isEditing}
                                         onChange={handleInputChange}
@@ -384,7 +425,7 @@ const UserProfile = () => {
 
                                     <ProfileField
                                         label="LinkedIn Profile"
-                                        value={editedData.linkedin}
+                                        value={editedData.linkedin || ""}
                                         name="linkedin"
                                         isEditing={isEditing}
                                         onChange={handleInputChange}
@@ -392,7 +433,7 @@ const UserProfile = () => {
 
                                     <ProfileField
                                         label="GitHub Profile"
-                                        value={editedData.github}
+                                        value={editedData.github || ""}
                                         name="github"
                                         isEditing={isEditing}
                                         onChange={handleInputChange}
@@ -400,7 +441,7 @@ const UserProfile = () => {
 
                                     <ProfileField
                                         label="X (Twitter) Profile"
-                                        value={editedData.twitter}
+                                        value={editedData.twitter || ""}
                                         name="twitter"
                                         isEditing={isEditing}
                                         onChange={handleInputChange}
@@ -413,13 +454,13 @@ const UserProfile = () => {
                                         {isEditing ? (
                                             <textarea
                                                 name="about"
-                                                value={editedData.about}
+                                                value={editedData.about || ""}
                                                 onChange={handleInputChange}
                                                 className="w-full p-4 bg-black border border-[rgba(229,228,226,0.5)] text-white outline-none transition-brutal focus:border-white min-h-[120px]"
                                             />
                                         ) : (
                                             <p className="text-white/85 border border-transparent p-4">
-                                                {editedData.about}
+                                                {editedData.about || "No about information provided"}
                                             </p>
                                         )}
                                     </div>
@@ -429,7 +470,7 @@ const UserProfile = () => {
                                             Member Since
                                         </label>
                                         <p className="text-white/85 border border-transparent p-4">
-                                            {editedData.joinedDate}
+                                            {editedData.joinedDate || "Unknown"}
                                         </p>
                                     </div>
 
@@ -513,7 +554,7 @@ const ProfileField = ({ label, value, name, isEditing, onChange, disabled = fals
             <input
                 type="text"
                 name={name}
-                value={value}
+                value={value || ""}
                 onChange={onChange}
                 disabled={disabled}
                 className={`w-full p-4 bg-black border border-[rgba(229,228,226,0.5)] text-white outline-none transition-brutal ${disabled ? "opacity-60 cursor-not-allowed" : "focus:border-white"
@@ -521,7 +562,7 @@ const ProfileField = ({ label, value, name, isEditing, onChange, disabled = fals
             />
         ) : (
             <p className={`text-white/85 border border-transparent p-4 ${disabled ? "opacity-60" : ""}`}>
-                {value}
+                {value || "Not specified"}
             </p>
         )}
         {name === "email" && isEditing && (

@@ -123,7 +123,7 @@ public class User {
         return github;
     }
 
-    public void setGithub(String twitter) {
+    public void setGithub(String github) {
         this.github = github;
     }
 
@@ -132,7 +132,7 @@ public class User {
     }
 
     public void setTwitter(String twitter) {
-        this.twitter = github;
+        this.twitter = twitter;
     }
 
     public String getAbout() {

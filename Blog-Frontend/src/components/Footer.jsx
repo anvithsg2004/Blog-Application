@@ -1,9 +1,61 @@
-import React from "react";
+import React, { useState } from "react";
 import { Link } from "react-router-dom";
 import { Twitter, Linkedin, Github } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
+import apiFetch from "../components/utils/api";
 
 const Footer = () => {
   const currentYear = new Date().getFullYear();
+  const { toast } = useToast();
+  const [email, setEmail] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const handleSubscribe = async (e) => {
+    e.preventDefault();
+    setIsSubmitting(true);
+
+    // Basic email validation
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      toast({
+        title: "Invalid Email",
+        description: "Please enter a valid email address.",
+        variant: "destructive",
+      });
+      setIsSubmitting(false);
+      return;
+    }
+
+    try {
+      const response = await apiFetch("/api/general-subscribers", {
+        method: "POST",
+        body: JSON.stringify({ email }),
+        headers: {
+          "Content-Type": "application/json",
+        },
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || "Failed to subscribe");
+      }
+
+      toast({
+        title: "Subscribed!",
+        description: "You’ll receive updates on all new and updated blogs.",
+        variant: "success",
+      });
+      setEmail("");
+    } catch (error) {
+      toast({
+        title: "Subscription Failed",
+        description: error.message || "Something went wrong. Try again later.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
   return (
     <footer className="bg-black border-t border-[rgba(229,228,226,0.3)] py-16">
@@ -58,17 +110,21 @@ const Footer = () => {
             <p className="text-[rgba(229,228,226,0.8)] mb-4">
               Stay updated with our latest blogs and news.
             </p>
-            <form className="flex">
+            <form onSubmit={handleSubscribe} className="flex">
               <input
                 type="email"
                 placeholder="Enter your email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
                 className="flex-1 py-3 px-3 bg-black border border-[rgba(229,228,226,0.5)] border-r-0 text-white outline-none inset-shadow transition-brutal"
+                disabled={isSubmitting}
               />
               <button
                 type="submit"
                 className="bg-white text-black py-3 px-4 uppercase text-xs leading-tight tracking-[1px] border-none cursor-pointer transition-brutal hover:bg-[#E5E4E2]"
+                disabled={isSubmitting}
               >
-                Subscribe
+                {isSubmitting ? "Subscribing..." : "Subscribe"}
               </button>
             </form>
           </div>
