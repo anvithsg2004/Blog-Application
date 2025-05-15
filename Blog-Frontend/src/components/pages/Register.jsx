@@ -71,16 +71,16 @@ const Register = () => {
         data.append("photo", formData.photo);
       }
 
-      await registerUser(data);
+      const response = await registerUser(data);
 
       toast({
         title: "Registration Successful",
-        description: "Please log in to continue.",
+        description: "Please verify your email with the OTP sent.",
         variant: "success",
       });
 
-      // Redirect to login page
-      navigate("/login");
+      // Navigate to OTP verification page with email
+      navigate("/verify-otp", { state: { email: response.email } });
     } catch (error) {
       toast({
         title: "Registration Failed",

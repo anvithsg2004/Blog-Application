@@ -20,6 +20,10 @@ export const AuthProvider = ({ children }) => {
                     },
                 });
                 const data = await response.json();
+                console.log("Auth status response:", data);
+                if (!data.user.isVerified) {
+                    throw new Error("User account is not verified");
+                }
                 setUser(data.user);
                 setIsLoggedIn(true);
                 localStorage.setItem("isLoggedIn", "true");
@@ -45,7 +49,7 @@ export const AuthProvider = ({ children }) => {
 
     const login = async (email, password, onSuccess) => {
         try {
-            setLoading(true); // Set loading to true during login
+            setLoading(true);
             const credentials = btoa(`${email}:${password}`);
             const response = await apiFetch("/api/users/profile", {
                 method: "GET",
@@ -54,11 +58,15 @@ export const AuthProvider = ({ children }) => {
                 },
             });
             const data = await response.json();
+            console.log("Login response:", data);
+            if (!data.user?.isVerified) {
+                throw new Error(`User account is not verified. isVerified: ${data.user?.isVerified}`);
+            }
             localStorage.setItem("authCredentials", credentials);
             localStorage.setItem("isLoggedIn", "true");
             setUser(data.user);
             setIsLoggedIn(true);
-            setLoading(false); // Set loading to false after successful login
+            setLoading(false);
             console.log("Logged in, user:", data.user);
             if (onSuccess) onSuccess();
             return data;

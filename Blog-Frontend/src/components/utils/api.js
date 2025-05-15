@@ -46,6 +46,22 @@ export const registerUser = async (formData) => {
     return response.json();
 };
 
+export const verifyOTP = async (email, otp) => {
+    const response = await apiFetch("/api/users/verify", {
+        method: "POST",
+        body: JSON.stringify({ email, otp }),
+    });
+    return response.json();
+};
+
+export const resendOTP = async (email) => {
+    const response = await apiFetch("/api/users/resend-otp", {
+        method: "POST",
+        body: JSON.stringify({ email }),
+    });
+    return response.json();
+};
+
 export const loginUser = async (email, password) => {
     const credentials = btoa(`${email}:${password}`);
     const response = await apiFetch("/api/users/profile", {

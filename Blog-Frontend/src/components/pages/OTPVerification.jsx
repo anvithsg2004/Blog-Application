@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useRef } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
+import { verifyOTP, resendOTP } from "../utils/api";
 
 const OTPVerification = () => {
     const [otp, setOtp] = useState(Array(4).fill(""));
@@ -10,13 +11,15 @@ const OTPVerification = () => {
     const inputRefs = useRef([]);
     const navigate = useNavigate();
     const { toast } = useToast();
+    const location = useLocation();
+    const email = location.state?.email || "";
 
-    // ensure we only ever have 4 refs
+    // Ensure we only ever have 4 refs
     useEffect(() => {
         inputRefs.current = inputRefs.current.slice(0, 4);
     }, []);
 
-    // countdown timer
+    // Countdown timer
     useEffect(() => {
         if (timer > 0) {
             const interval = setInterval(() => {
@@ -49,7 +52,7 @@ const OTPVerification = () => {
         }
     };
 
-    const handleSubmit = (e) => {
+    const handleSubmit = async (e) => {
         e.preventDefault();
         const code = otp.join("");
         if (code.length !== 4) {
@@ -62,31 +65,47 @@ const OTPVerification = () => {
         }
 
         setIsSubmitting(true);
-        setTimeout(() => {
-            if (code === "1234") {
-                toast({
-                    title: "Verification successful",
-                    description: "Your account has been verified.",
-                });
-                navigate("/login");
-            } else {
-                toast({
-                    title: "Invalid verification code",
-                    description: "Please try again or request a new code.",
-                    variant: "destructive",
-                });
-                setIsSubmitting(false);
-            }
-        }, 1500);
+        try {
+            await verifyOTP(email, code);
+            toast({
+                title: "Verification Successful",
+                description: "Your account has been verified.",
+                variant: "success",
+            });
+            navigate("/login");
+        } catch (error) {
+            toast({
+                title: "Invalid Verification Code",
+                description: error.message || "Please try again or request a new code.",
+                variant: "destructive",
+            });
+        } finally {
+            setIsSubmitting(false);
+        }
     };
 
-    const handleResendOtp = () => {
-        setTimer(30);
-        toast({
-            title: "OTP sent",
-            description: "A new verification code has been sent to your email.",
-        });
+    const handleResendOtp = async () => {
+        try {
+            await resendOTP(email);
+            setTimer(30);
+            toast({
+                title: "OTP Sent",
+                description: "A new verification code has been sent to your email.",
+                variant: "success",
+            });
+        } catch (error) {
+            toast({
+                title: "Resend Failed",
+                description: error.message || "Failed to resend OTP.",
+                variant: "destructive",
+            });
+        }
     };
+
+    if (!email) {
+        navigate("/register");
+        return null;
+    }
 
     return (
         <div className="pt-20 min-h-screen flex items-center justify-center bg-black px-6">
@@ -96,7 +115,7 @@ const OTPVerification = () => {
                         VERIFY YOUR ACCOUNT
                     </h1>
                     <p className="text-[rgba(229,228,226,0.8)]">
-                        Enter the 4-digit code sent to your email
+                        Enter the 4-digit code sent to {email}
                     </p>
                 </div>
 
@@ -142,13 +161,6 @@ const OTPVerification = () => {
                     >
                         {isSubmitting ? "VERIFYING..." : "VERIFY"}
                     </Button>
-
-                    <p className="text-xs text-[rgba(229,228,226,0.6)] text-center mt-4">
-                        <span className="block mb-1">For testing use:</span>
-                        <span className="inline-block bg-[rgba(229,228,226,0.1)] px-2 py-1 font-mono">
-                            1234
-                        </span>
-                    </p>
                 </form>
             </div>
         </div>

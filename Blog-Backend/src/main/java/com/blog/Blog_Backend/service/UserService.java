@@ -21,14 +21,38 @@ public class UserService {
     @Autowired
     private PasswordEncoder passwordEncoder;
 
+    @Autowired
+    private OTPService otpService;
+
     /**
      * Create a new user. Photo is optional/nullable.
      */
     public User createUser(User user) {
+        // Check if email already exists
+        if (userRepository.findByEmail(user.getEmail()).isPresent()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Email already registered");
+        }
         // Hash the password before saving
         if (user.getPassword() != null) {
             user.setPassword(passwordEncoder.encode(user.getPassword()));
         }
+        user.setVerified(false); // Set as unverified
+        User savedUser = userRepository.save(user);
+        // Send OTP
+        otpService.sendOTP(user.getEmail());
+        return savedUser;
+    }
+
+    /**
+     * Verify user by email
+     */
+    public User verifyUser(String email, String otp) {
+        if (!otpService.verifyOTP(email, otp)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid or expired OTP");
+        }
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found"));
+        user.setVerified(true);
         return userRepository.save(user);
     }
 

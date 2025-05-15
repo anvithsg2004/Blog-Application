@@ -68,4 +68,20 @@ public class NotificationController {
         notificationRepository.save(notification);
         return ResponseEntity.ok().build();
     }
+
+    // Delete a single notification
+    @DeleteMapping("/{id}")
+    public ResponseEntity<?> deleteNotification(@PathVariable String id) {
+        String email = SecurityUtils.getCurrentUserEmail();
+        if (email == null) {
+            return new ResponseEntity<>(HttpStatus.UNAUTHORIZED);
+        }
+        Notification notification = notificationRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Notification not found"));
+        if (!notification.getUserEmail().equals(email)) {
+            return new ResponseEntity<>(HttpStatus.FORBIDDEN);
+        }
+        notificationRepository.delete(notification);
+        return ResponseEntity.ok().build();
+    }
 }

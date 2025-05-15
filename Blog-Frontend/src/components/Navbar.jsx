@@ -95,21 +95,29 @@ const Navbar = () => {
   const handleNotificationItemClick = async (notification) => {
     try {
       // Mark the specific notification as read
-      const response = await apiFetch(`/api/notifications/${notification.id}/mark-read`, {
+      await apiFetch(`/api/notifications/${notification.id}/mark-read`, {
         method: "POST",
         headers: {
           Authorization: `Basic ${localStorage.getItem("authCredentials")}`,
         },
       });
-      if (response.ok) {
-        setNotifications((prev) =>
-          prev.map((n) => (n.id === notification.id ? { ...n, isRead: true } : n))
-        );
-      }
+
+      // Delete the notification
+      await apiFetch(`/api/notifications/${notification.id}`, {
+        method: "DELETE",
+        headers: {
+          Authorization: `Basic ${localStorage.getItem("authCredentials")}`,
+        },
+      });
+
+      // Update local state to remove the notification
+      setNotifications((prev) => prev.filter((n) => n.id !== notification.id));
+
+      // Navigate to the blog
       navigate(`/blog/${notification.blogId}`);
       setIsNotificationDropdownOpen(false);
     } catch (error) {
-      console.error("Error marking notification as read:", error);
+      console.error("Error handling notification click:", error);
     }
   };
 

@@ -53,7 +53,7 @@ const App = () => (
                 <Route path="/" element={<Home />} />
                 <Route path="/login" element={<Login />} />
                 <Route path="/register" element={<Register />} />
-                <Route path="/verify" element={<OTPVerification />} />
+                <Route path="/verify-otp" element={<OTPVerification />} />
                 <Route path="/profile" element={<UserProfile />} />
                 <Route path="/write-blog" element={<WriteBlog />} />
                 <Route path="/blog/:id" element={<BlogDetail />} />

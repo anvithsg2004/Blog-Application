@@ -36,6 +36,8 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/users").permitAll() // Allow registration
                         .requestMatchers(HttpMethod.GET, "/api/blogs").permitAll() // Allow seeing list of blogs
+                        .requestMatchers(HttpMethod.POST, "/api/users/verify").permitAll() // Allow OTP verification
+                        .requestMatchers(HttpMethod.POST, "/api/users/resend-otp").permitAll() // Allow OTP resend
                         // Authenticated endpoints
                         .requestMatchers(HttpMethod.GET, "/api/blogs/{blogId}").authenticated() // Blog details
                         .requestMatchers(HttpMethod.POST, "/api/blogs").authenticated() // Create blog

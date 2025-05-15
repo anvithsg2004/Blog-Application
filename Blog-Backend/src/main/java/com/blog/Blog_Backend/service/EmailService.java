@@ -122,7 +122,7 @@ public class EmailService {
         }
     }
 
-    private void sendEmail(String to, String subject, String htmlContent) {
+    public void sendEmail(String to, String subject, String htmlContent) {
         try {
             MimeMessage message = mailSender.createMimeMessage();
             MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");

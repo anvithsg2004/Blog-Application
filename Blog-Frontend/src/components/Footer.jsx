@@ -71,13 +71,13 @@ const Footer = () => {
               futuristic elegance. Express your thoughts with stark contrasts.
             </p>
             <div className="flex gap-4">
-              <SocialLink href="https://twitter.com/aidenblog" label="Twitter">
+              <SocialLink href="https://x.com/annn_2004" label="Twitter">
                 <Twitter size={20} />
               </SocialLink>
-              <SocialLink href="https://linkedin.com/company/aidenblog" label="LinkedIn">
+              <SocialLink href="https://www.linkedin.com/in/anvith-s-g-3618b1344/" label="LinkedIn">
                 <Linkedin size={20} />
               </SocialLink>
-              <SocialLink href="https://github.com/aidenblog" label="GitHub">
+              <SocialLink href="https://github.com/anvithsg2004" label="GitHub">
                 <Github size={20} />
               </SocialLink>
             </div>
@@ -97,10 +97,36 @@ const Footer = () => {
           <div className="md:col-span-2">
             <h3 className="uppercase text-xs leading-tight tracking-[1px] text-[#E5E4E2] mb-4">Resources</h3>
             <ul className="list-none p-0 m-0 grid gap-3">
-              <FooterLink to="/about">About</FooterLink>
-              <FooterLink to="/privacy-policy">Privacy</FooterLink>
-              <FooterLink to="/terms">Terms</FooterLink>
-              <FooterLink to="/contact">Contact</FooterLink>
+              <li>
+                <a
+                  href="https://anvithsg.netlify.app/"
+                  className="text-[rgba(229,228,226,0.8)] no-underline transition-brutal hover:text-white"
+                >
+                  About
+                </a>
+              </li>
+              <li>
+                <span
+                  className="text-[rgba(229,228,226,0.8)] no-underline transition-brutal hover:text-white cursor-default"
+                >
+                  Privacy
+                </span>
+              </li>
+              <li>
+                <span
+                  className="text-[rgba(229,228,226,0.8)] no-underline transition-brutal hover:text-white cursor-default"
+                >
+                  Terms
+                </span>
+              </li>
+              <li>
+                <a
+                  href="https://anvithsg.netlify.app/"
+                  className="text-[rgba(229,228,226,0.8)] no-underline transition-brutal hover:text-white"
+                >
+                  Contact
+                </a>
+              </li>
             </ul>
           </div>
 
@@ -136,18 +162,16 @@ const Footer = () => {
             © {currentYear} AIDEN Blog. All rights reserved.
           </p>
           <div className="flex gap-6">
-            <Link
-              to="/privacy-policy"
-              className="text-[rgba(229,228,226,0.6)] text-sm no-underline transition-brutal hover:text-white"
+            <span
+              className="text-[rgba(229,228,226,0.6)] text-sm no-underline transition-brutal hover:text-white cursor-default"
             >
               Privacy Policy
-            </Link>
-            <Link
-              to="/terms"
-              className="text-[rgba(229,228,226,0.6)] text-sm no-underline transition-brutal hover:text-white"
+            </span>
+            <span
+              className="text-[rgba(229,228,226,0.6)] text-sm no-underline transition-brutal hover:text-white cursor-default"
             >
               Terms of Service
-            </Link>
+            </span>
           </div>
         </div>
       </div>

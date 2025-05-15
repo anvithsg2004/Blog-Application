@@ -1,5 +1,6 @@
 package com.blog.Blog_Backend.entity;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import org.springframework.data.annotation.CreatedDate;
 import org.springframework.data.annotation.Id;
 import org.springframework.data.annotation.LastModifiedDate;
@@ -22,6 +23,7 @@ public class User {
     private String github;
     private String twitter;
     private String about;
+    private boolean isVerified;
 
     @CreatedDate
     private Date createdAt;
@@ -44,6 +46,7 @@ public class User {
                 String github,
                 String twitter,
                 String about,
+                boolean isVerified,
                 Date createdAt,
                 Date updatedAt) {
         this.id = id;
@@ -56,6 +59,7 @@ public class User {
         this.github = github;
         this.twitter = twitter;
         this.about = about;
+        this.isVerified = isVerified;
         this.createdAt = createdAt;
         this.updatedAt = updatedAt;
     }
@@ -102,7 +106,6 @@ public class User {
         this.phone = phone;
     }
 
-    // Return Base64-encoded photo string
     public String getPhoto() {
         return photo != null ? Base64.getEncoder().encodeToString(photo) : null;
     }
@@ -141,6 +144,15 @@ public class User {
 
     public void setAbout(String about) {
         this.about = about;
+    }
+
+    @JsonProperty("isVerified")
+    public boolean isVerified() {
+        return isVerified;
+    }
+
+    public void setVerified(boolean verified) {
+        isVerified = verified;
     }
 
     public Date getCreatedAt() {
