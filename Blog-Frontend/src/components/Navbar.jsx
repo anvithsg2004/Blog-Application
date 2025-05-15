@@ -71,7 +71,7 @@ const Navbar = () => {
       console.log("handleProfileClick: Still loading, delaying navigation");
       return;
     }
-    if (isLoggedIn && user) {
+    if (isLoggedIn) {
       console.log("Navigating to /profile");
       navigate("/profile");
     } else {
@@ -334,7 +334,12 @@ const UserControls = ({
         </div>
       )}
     </div>
-    <UserAvatar userImage={userImage} onClick={onProfileClick} />
+    <button
+      onClick={onProfileClick}
+      className="text-xs uppercase tracking-[1px] text-white no-underline transition-brutal hover:text-[#E5E4E2] hover:-translate-y-0.5"
+    >
+      MY PROFILE
+    </button>
     <button
       onClick={onLogout}
       className="text-xs uppercase tracking-[1px] text-white no-underline transition-brutal hover:text-[#E5E4E2] hover:-translate-y-0.5 flex items-center gap-1"

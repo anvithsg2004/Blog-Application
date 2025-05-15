@@ -82,7 +82,11 @@ const Home = () => {
   };
 
   if (loading) {
-    return <div className="pt-20 min-h-screen bg-black text-white text-center">Loading...</div>;
+    return (
+      <div className="pt-20 min-h-screen bg-black flex items-center justify-center">
+        <div className="w-16 h-16 border-4 border-t-white border-r-white/30 border-b-white/10 border-l-white/60 rounded-full animate-spin"></div>
+      </div>
+    );
   }
 
   return (
