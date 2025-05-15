@@ -3,6 +3,8 @@ import Hero from "@/components/Hero";
 import BlogCard from "@/components/BlogCard";
 import FeaturedBlog from "@/components/FeaturedBlog";
 import { Search } from "lucide-react";
+import { Link } from "react-router-dom";
+import { Button } from "@/components/ui/button";
 import apiFetch from "../utils/api";
 
 const Home = () => {
@@ -47,8 +49,7 @@ const Home = () => {
         }));
 
         setAllBlogs(formattedBlogs);
-        setDisplayedBlogs(formattedBlogs);
-
+        setDisplayedBlogs(formattedBlogs.slice(0, 5)); // Limit to 5 blogs initially
         if (formattedBlogs.length > 0) {
           setFeaturedBlog(formattedBlogs[0]);
         }
@@ -73,10 +74,10 @@ const Home = () => {
           blog.title.toLowerCase().includes(query) ||
           blog.excerpt.toLowerCase().includes(query)
       );
-      setDisplayedBlogs(filtered);
+      setDisplayedBlogs(filtered.slice(0, 5)); // Limit to 5 blogs for search results
     } else {
       setIsSearching(false);
-      setDisplayedBlogs(allBlogs);
+      setDisplayedBlogs(allBlogs.slice(0, 5)); // Limit to 5 blogs when clearing search
     }
   };
 
@@ -136,6 +137,15 @@ const Home = () => {
               </p>
             </div>
           )}
+
+          {/* Explore All Button */}
+          <div className="mt-12 text-center">
+            <Link to="/blogs">
+              <Button className="font-['Space_Grotesk'] font-bold py-6 px-8">
+                EXPLORE ALL
+              </Button>
+            </Link>
+          </div>
         </div>
       </section>
     </div>
