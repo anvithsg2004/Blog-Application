@@ -416,14 +416,6 @@ const UserProfile = () => {
                                     />
 
                                     <ProfileField
-                                        label="Location"
-                                        value={editedData.location || "Not specified"}
-                                        name="location"
-                                        isEditing={isEditing}
-                                        onChange={handleInputChange}
-                                    />
-
-                                    <ProfileField
                                         label="LinkedIn Profile"
                                         value={editedData.linkedin || ""}
                                         name="linkedin"
@@ -463,15 +455,6 @@ const UserProfile = () => {
                                                 {editedData.about || "No about information provided"}
                                             </p>
                                         )}
-                                    </div>
-
-                                    <div className="grid gap-2">
-                                        <label className="uppercase text-xs tracking-[1px] text-[#E5E4E2]">
-                                            Member Since
-                                        </label>
-                                        <p className="text-white/85 border border-transparent p-4">
-                                            {editedData.joinedDate || "Unknown"}
-                                        </p>
                                     </div>
 
                                     {isEditing && (

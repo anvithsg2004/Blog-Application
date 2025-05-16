@@ -49,14 +49,16 @@ const BlogDetail = () => {
                         ? { language: data.codeLanguage || "javascript", content: data.codeSnippet }
                         : null,
                     imageUrl: data.image ? `data:image/jpeg;base64,${data.image}` : null,
-                    date: new Date(data.createdAt).toLocaleDateString('en-US', {
+                    createdAt: data.createdAt,
+                    updatedAt: data.updatedAt,
+                    date: data.createdAt ? new Date(data.createdAt).toLocaleDateString('en-US', {
                         month: 'short',
                         day: 'numeric',
                         year: 'numeric'
-                    }).toUpperCase(),
+                    }).toUpperCase() : "Unknown",
                 });
                 setAuthor({
-                    email: data.authorEmail, // Use authorEmail instead of author.id
+                    email: data.authorEmail,
                     name: data.author.name,
                     photo: data.author.photo ? `data:image/jpeg;base64,${data.author.photo}` : null,
                     about: data.author.about,
@@ -201,7 +203,7 @@ const BlogDetail = () => {
 
                 <header className="mb-12">
                     <div className="uppercase text-xs leading-tight tracking-[1px] text-[rgba(229,228,226,0.6)] mb-4">
-                        {blog.date} • {author.name}
+                        {author.name}
                     </div>
                     <h1 className="text-4xl md:text-5xl font-['Space_Grotesk'] font-bold tracking-[-1px] text-white mb-8">
                         {blog.title}
@@ -267,6 +269,33 @@ const BlogDetail = () => {
                         </div>
                     </div>
                 )}
+
+                {/* Dates Section */}
+                <div className="mt-8 mb-12">
+                    <h3 className="text-xl font-['Space_Grotesk'] font-bold text-white mb-4">
+                        Publication Dates
+                    </h3>
+                    <div className="text-[rgba(229,228,226,0.8)]">
+                        <p>
+                            <span className="font-bold">Published:</span>{' '}
+                            {blog.createdAt ? new Date(blog.createdAt).toLocaleDateString('en-US', {
+                                month: 'short',
+                                day: 'numeric',
+                                year: 'numeric'
+                            }) : 'Unknown'}
+                        </p>
+                        {blog.updatedAt && blog.createdAt && new Date(blog.updatedAt).getTime() !== new Date(blog.createdAt).getTime() && (
+                            <p>
+                                <span className="font-bold">Updated:</span>{' '}
+                                {new Date(blog.updatedAt).toLocaleDateString('en-US', {
+                                    month: 'short',
+                                    day: 'numeric',
+                                    year: 'numeric'
+                                })}
+                            </p>
+                        )}
+                    </div>
+                </div>
 
                 {/* Author information */}
                 <div className="mt-16 pt-8 border-t border-[rgba(229,228,226,0.3)]">
@@ -359,7 +388,7 @@ const BlogDetail = () => {
                 .markdown-content p {
                     margin: 0.5rem 0;
                     color: rgba(229, 228, 226, 0.8);
-                    line-height: 1.6;
+                    lineHeight: 1.6;
                 }
                 .markdown-content ul,
                 .markdown-content ol {

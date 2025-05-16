@@ -181,7 +181,7 @@ const Register = () => {
                 type="tel"
                 value={formData.phone}
                 onChange={handleChange}
-                placeholder="+1 (555) 123-4567"
+                placeholder="Do not add +91"
               />
             </div>
 
