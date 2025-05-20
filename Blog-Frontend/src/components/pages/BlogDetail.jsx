@@ -21,6 +21,9 @@ const BlogDetail = () => {
     const [isSubscribing, setIsSubscribing] = useState(false);
     const [summary, setSummary] = useState('');
     const [isSummarizing, setIsSummarizing] = useState(false);
+    const [question, setQuestion] = useState('');
+    const [qaHistory, setQaHistory] = useState([]);
+    const [isAnswering, setIsAnswering] = useState(false);
 
     useEffect(() => {
         const fetchBlogAndSubscription = async () => {
@@ -110,9 +113,9 @@ const BlogDetail = () => {
 
         setIsSummarizing(true);
         setSummary('');
+        setQaHistory([]); // Clear QA history when a new summary is generated
 
         try {
-            // Combine blog content and code snippet (if available)
             let fullContent = blog.content || '';
             if (blog.codeSnippet?.content) {
                 const cleanedCode = blog.codeSnippet.content
@@ -121,19 +124,16 @@ const BlogDetail = () => {
                 fullContent += `\n\nCode Example (${blog.codeSnippet.language}):\n${cleanedCode}`;
             }
 
-            // Clean the full content
             fullContent = fullContent
                 .replace(/[\x00-\x1F\x7F-\x9F]/g, '')
                 .replace(/["'`]/g, '"');
 
-            // Estimate tokens and truncate
-            const inputWords = fullContent.split(' '); // Renamed to inputWords
+            const inputWords = fullContent.split(' ');
             const estimatedTokens = inputWords.length * 1.3;
             const maxTokens = 800;
             const maxWords = Math.floor(maxTokens / 1.3);
             const truncatedContent = inputWords.length > maxWords ? inputWords.slice(0, maxWords).join(' ') : fullContent;
 
-            // Ensure content isn't empty
             let contentToSummarize = truncatedContent.trim();
             if (!contentToSummarize) {
                 throw new Error('Content is empty after processing.');
@@ -187,13 +187,11 @@ const BlogDetail = () => {
                         throw new Error('Model loading failed after retry. Please try again later.');
                     }
                     const retryResult = await retryResponse.json();
-                    // Stream the retry result
                     const fullSummary = retryResult[0].summary_text;
                     if (!fullSummary) {
                         throw new Error('No summary returned from the API.');
                     }
-                    // Split the summary into words for streaming
-                    const retrySummaryWords = fullSummary.split(' '); // Renamed to retrySummaryWords
+                    const retrySummaryWords = fullSummary.split(' ');
                     let currentSummary = '';
                     let index = 0;
 
@@ -202,9 +200,9 @@ const BlogDetail = () => {
                             currentSummary += (index > 0 ? ' ' : '') + retrySummaryWords[index];
                             setSummary(currentSummary);
                             index++;
-                            setTimeout(streamSummary, 50); // Adjust speed (50ms per word)
+                            setTimeout(streamSummary, 50);
                         } else {
-                            setIsSummarizing(false); // End streaming
+                            setIsSummarizing(false);
                         }
                     };
                     streamSummary();
@@ -219,9 +217,8 @@ const BlogDetail = () => {
                 throw new Error('No summary returned from the API.');
             }
 
-            // Stream the summary
             const fullSummary = result[0].summary_text;
-            const summaryWords = fullSummary.split(' '); // Renamed to summaryWords
+            const summaryWords = fullSummary.split(' ');
             let currentSummary = '';
             let index = 0;
 
@@ -230,9 +227,9 @@ const BlogDetail = () => {
                     currentSummary += (index > 0 ? ' ' : '') + summaryWords[index];
                     setSummary(currentSummary);
                     index++;
-                    setTimeout(streamSummary, 50); // Adjust speed (50ms per word)
+                    setTimeout(streamSummary, 50);
                 } else {
-                    setIsSummarizing(false); // End streaming
+                    setIsSummarizing(false);
                 }
             };
             streamSummary();
@@ -245,6 +242,86 @@ const BlogDetail = () => {
                 variant: "destructive",
             });
             setIsSummarizing(false);
+        }
+    };
+
+    const handleAskQuestion = async () => {
+        if (!question.trim()) {
+            toast({
+                title: "Invalid Input",
+                description: "Please enter a question.",
+                variant: "destructive",
+            });
+            return;
+        }
+
+        if (!blog?.content) {
+            toast({
+                title: "No Content",
+                description: "There is no blog content to answer from.",
+                variant: "destructive",
+            });
+            return;
+        }
+
+        setIsAnswering(true);
+
+        try {
+            // Clean the blog content
+            let contentToAnswer = blog.content
+                .replace(/[\x00-\x1F\x7F-\x9F]/g, '')
+                .replace(/["'`]/g, '"')
+                .trim();
+
+            if (!contentToAnswer) {
+                throw new Error('Blog content is empty after processing.');
+            }
+
+            const response = await fetch('https://api-inference.huggingface.co/models/deepset/roberta-base-squad2', {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer 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`,
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    inputs: {
+                        question: question.trim(),
+                        context: contentToAnswer,
+                    },
+                }),
+            });
+
+            if (!response.ok) {
+                if (response.status === 400) {
+                    const errorData = await response.json();
+                    throw new Error(errorData.error || 'Invalid input for question answering.');
+                } else if (response.status === 401) {
+                    throw new Error('Authentication failed. Please check your API key.');
+                } else if (response.status === 429) {
+                    throw new Error('Rate limit reached. Please try again later.');
+                } else if (response.status === 503) {
+                    throw new Error('Model is loading. Please try again later.');
+                } else {
+                    throw new Error('Failed to process the question.');
+                }
+            }
+
+            const result = await response.json();
+            if (!result.answer) {
+                throw new Error('No answer returned from the API.');
+            }
+
+            setQaHistory([...qaHistory, { question: question.trim(), answer: result.answer }]);
+            setQuestion('');
+        } catch (error) {
+            console.error('Question answering error:', error);
+            toast({
+                title: "Question Answering Failed",
+                description: error.message || "Could not process your question.",
+                variant: "destructive",
+            });
+        } finally {
+            setIsAnswering(false);
         }
     };
 
@@ -378,7 +455,42 @@ const BlogDetail = () => {
                                         Summary
                                     </h3>
                                     <div className="p-4 bg-[rgba(229,228,226,0.1)] border-2 border-[rgba(229,228,226,0.3)] rounded-lg">
-                                        <p className="text-white">{summary}</p>
+                                        <p className="text-white mb-4">{summary}</p>
+                                        <div className="mt-4">
+                                            <h4 className="text-lg font-['Space_Grotesk'] font-bold text-white mb-2">
+                                                Have a question about the blog?
+                                            </h4>
+                                            <div className="flex gap-2 mb-4">
+                                                <input
+                                                    type="text"
+                                                    value={question}
+                                                    onChange={(e) => setQuestion(e.target.value)}
+                                                    placeholder="Ask a question about the blog..."
+                                                    className="flex-1 px-3 py-2 bg-[rgba(229,228,226,0.1)] border border-[rgba(229,228,226,0.3)] text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-white"
+                                                />
+                                                <button
+                                                    onClick={handleAskQuestion}
+                                                    className={`px-4 py-2 text-sm font-medium font-['Space_Grotesk'] text-black bg-white hover:bg-[#E5E4E2] transition-brutal ${isAnswering ? 'opacity-50 cursor-not-allowed' : ''}`}
+                                                    disabled={isAnswering}
+                                                >
+                                                    {isAnswering ? 'Answering...' : 'Ask'}
+                                                </button>
+                                            </div>
+                                            {qaHistory.length > 0 && (
+                                                <div className="mt-4">
+                                                    {qaHistory.map((qa, index) => (
+                                                        <div key={index} className="mb-4">
+                                                            <p className="text-[rgba(229,228,226,0.8)]">
+                                                                <span className="font-bold">Q:</span> {qa.question}
+                                                            </p>
+                                                            <p className="text-white">
+                                                                <span className="font-bold">A:</span> {qa.answer}
+                                                            </p>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            )}
+                                        </div>
                                     </div>
                                 </div>
                             )}
@@ -390,7 +502,42 @@ const BlogDetail = () => {
                                 Summary
                             </h3>
                             <div className="p-4 bg-[rgba(229,228,226,0.1)] border-2 border-[rgba(229,228,226,0.3)] rounded-lg">
-                                <p className="text-white">{summary}</p>
+                                <p className="text-white mb-4">{summary}</p>
+                                <div className="mt-4">
+                                    <h4 className="text-lg font-['Space_Grotesk'] font-bold text-white mb-2">
+                                        Have a question about the blog?
+                                    </h4>
+                                    <div className="flex gap-2 mb-4">
+                                        <input
+                                            type="text"
+                                            value={question}
+                                            onChange={(e) => setQuestion(e.target.value)}
+                                            placeholder="Ask a question about the blog..."
+                                            className="flex-1 px-3 py-2 bg-[rgba(229,228,226,0.1)] border border-[rgba(229,228,226,0.3)] text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-white"
+                                        />
+                                        <button
+                                            onClick={handleAskQuestion}
+                                            className={`px-4 py-2 text-sm font-medium font-['Space_Grotesk'] text-black bg-white hover:bg-[#E5E4E2] transition-brutal ${isAnswering ? 'opacity-50 cursor-not-allowed' : ''}`}
+                                            disabled={isAnswering}
+                                        >
+                                            {isAnswering ? 'Answering...' : 'Ask'}
+                                        </button>
+                                    </div>
+                                    {qaHistory.length > 0 && (
+                                        <div className="mt-4">
+                                            {qaHistory.map((qa, index) => (
+                                                <div key={index} className="mb-4">
+                                                    <p className="text-[rgba(229,228,226,0.8)]">
+                                                        <span className="font-bold">Q:</span> {qa.question}
+                                                    </p>
+                                                    <p className="text-white">
+                                                        <span className="font-bold">A:</span> {qa.answer}
+                                                    </p>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+                                </div>
                             </div>
                         </div>
                     )}
