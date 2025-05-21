@@ -1,4 +1,4 @@
-const API_BASE_URL = "https://blogs-backend-q5my.onrender.com";
+const API_BASE_URL = "https://blogs-backend-5jnv.onrender.com";
 
 // Function to get the Base64-encoded credentials from localStorage
 const getAuthCredentials = () => {
