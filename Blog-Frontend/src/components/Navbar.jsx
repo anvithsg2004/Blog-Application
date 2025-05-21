@@ -122,7 +122,9 @@ const Navbar = () => {
   };
 
   if (loading) {
-    return <div>Loading...</div>;
+    return <div className="h-20 bg-black flex items-center justify-center">
+      <div className="w-8 h-8 border-4 border-t-white border-r-white/30 border-b-white/10 border-l-white/60 rounded-full animate-spin"></div>
+    </div>;
   }
 
   return (
