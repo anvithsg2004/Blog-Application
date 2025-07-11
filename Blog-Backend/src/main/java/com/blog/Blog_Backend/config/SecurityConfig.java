@@ -61,8 +61,8 @@ public class SecurityConfig {
     @Bean
     CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration config = new CorsConfiguration();
-        // config.setAllowedOrigins(List.of("http://localhost:5173", "https://aidenblog.netlify.app", "https://blogs-backend-fj3b.onrender.com"));
-        config.setAllowedOrigins(Arrays.asList("*"));
+         config.setAllowedOrigins(List.of("http://localhost:5173", "https://aidenblog.netlify.app", "https://blogs-backend-fj3b.onrender.com", "https://newblogbackend.onrender.com"));
+//        config.setAllowedOrigins(Arrays.asList("*"));
         config.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS"));
         config.setAllowedHeaders(Arrays.asList("*"));
         config.setAllowCredentials(true);
