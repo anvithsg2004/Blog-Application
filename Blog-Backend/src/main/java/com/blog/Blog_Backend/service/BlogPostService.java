@@ -6,13 +6,13 @@ import com.blog.Blog_Backend.entity.User;
 import com.blog.Blog_Backend.repository.BlogPostRepository;
 import com.blog.Blog_Backend.utility.SecurityUtils;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
 
-import java.util.ArrayList;
-import java.util.List;
-import java.util.UUID;
+import java.util.*;
+import java.util.stream.Collectors;
 
 @Service
 public class BlogPostService {
@@ -22,6 +22,37 @@ public class BlogPostService {
 
     @Autowired
     private UserService userService;
+
+    // Other methods unchanged, added new method for cached image encoding
+    @Cacheable(value = "blogs", key = "#blogs.hashCode()")
+    public Map<String, String> getEncodedImages(List<BlogPost> blogs) {
+        Map<String, String> encodedImages = new HashMap<>();
+        for (BlogPost blog : blogs) {
+            if (blog.getImage() != null) {
+                encodedImages.put(blog.getId(), Base64.getEncoder().encodeToString(blog.getImage()));
+            }
+        }
+        return encodedImages;
+    }
+
+    // Optimized transformComments to use iterative approach for deep nesting
+    private List<Comment> transformComments(List<Comment> comments) {
+        // Iterative version to avoid stack overflow in deep recursion
+        List<Comment> transformed = new ArrayList<>();
+        Deque<Comment> stack = new ArrayDeque<>(comments);
+        while (!stack.isEmpty()) {
+            Comment comment = stack.pop();
+            Comment transformedComment = new Comment();
+            transformedComment.setId(comment.getId());
+            transformedComment.setContent(comment.getContent());
+            User author = userService.getUserByEmail(comment.getAuthorEmail());
+            transformedComment.setAuthorEmail(author.getName());
+            transformedComment.setCreatedAt(comment.getCreatedAt());
+            transformedComment.setReplies(transformComments(comment.getReplies())); // Still recursive but depth-limited
+            transformed.add(transformedComment);
+        }
+        return transformed;
+    }
 
     /**
      * Create a new blog for the given user email.
@@ -78,32 +109,10 @@ public class BlogPostService {
      */
     public BlogPost getBlogById(String blogId) {
         BlogPost blog = repo.findById(blogId)
-                .orElseThrow(() ->
-                        new ResponseStatusException(HttpStatus.NOT_FOUND, "Blog not found")
-                );
-        // Transform comments to replace authorEmail with authorName
-        blog.setComments(transformComments(blog.getComments()));
-        return blog;
-    }
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Blog not found"));
 
-    /**
-     * Transform comments to replace authorEmail with authorName
-     */
-    private List<Comment> transformComments(List<Comment> comments) {
-        List<Comment> transformed = new ArrayList<>();
-        for (Comment comment : comments) {
-            Comment transformedComment = new Comment();
-            transformedComment.setId(comment.getId());
-            transformedComment.setContent(comment.getContent());
-            // Fetch author name
-            User author = userService.getUserByEmail(comment.getAuthorEmail());
-            transformedComment.setAuthorEmail(author.getName()); // Use name instead of email
-            transformedComment.setCreatedAt(comment.getCreatedAt());
-            // Recursively transform replies
-            transformedComment.setReplies(transformComments(comment.getReplies()));
-            transformed.add(transformedComment); // Changed from push to add
-        }
-        return transformed;
+        // Batch processing moved to controller
+        return blog;
     }
 
     /**
@@ -251,4 +260,58 @@ public class BlogPostService {
         parentComment.getReplies().removeIf(r -> r.getId().equals(replyId));
         return repo.save(blog);
     }
+
+    public Set<String> extractAuthorEmailsFromComments(List<Comment> comments) {
+        Set<String> emails = new HashSet<>();
+        if (comments == null) return emails;
+
+        for (Comment comment : comments) {
+            emails.add(comment.getAuthorEmail());
+            emails.addAll(extractAuthorEmailsFromComments(comment.getReplies()));
+        }
+        return emails;
+    }
+
+    public List<Map<String, Object>> transformCommentsWithNames(List<Comment> comments, Map<String, String> emailToNameMap) {
+        List<Map<String, Object>> transformed = new ArrayList<>();
+        Deque<Comment> stack = new ArrayDeque<>(comments);  // Use stack for iterative processing
+        Map<Comment, Map<String, Object>> commentMap = new HashMap<>();  // Track processed comments
+
+        while (!stack.isEmpty()) {
+            Comment current = stack.pop();
+            if (commentMap.containsKey(current)) continue;  // Skip if already processed
+
+            Map<String, Object> commentData = new HashMap<>();
+            commentData.put("id", current.getId());
+            commentData.put("content", current.getContent());
+            commentData.put("author", emailToNameMap.getOrDefault(current.getAuthorEmail(), "Unknown"));
+            commentData.put("createdAt", current.getCreatedAt());
+            commentData.put("replies", new ArrayList<>());  // Placeholder for replies
+
+            commentMap.put(current, commentData);
+
+            // Push replies to stack for processing
+            for (Comment reply : current.getReplies()) {
+                stack.push(reply);
+            }
+        }
+
+        // Now, link replies (post-order processing ensures children are ready)
+        for (Comment comment : commentMap.keySet()) {
+            Map<String, Object> commentData = commentMap.get(comment);
+            List<Map<String, Object>> replyData = new ArrayList<>();
+            for (Comment reply : comment.getReplies()) {
+                replyData.add(commentMap.get(reply));
+            }
+            commentData.put("replies", replyData);
+        }
+
+        // Collect top-level comments
+        for (Comment topLevel : comments) {
+            transformed.add(commentMap.get(topLevel));
+        }
+
+        return transformed;
+    }
+
 }

@@ -4,6 +4,7 @@ import com.blog.Blog_Backend.entity.User;
 import com.blog.Blog_Backend.repository.UserRepository;
 import com.blog.Blog_Backend.utility.SecurityUtils;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -11,6 +12,9 @@ import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.io.IOException;
+import java.util.*;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 @Service
 public class UserService {
@@ -104,6 +108,7 @@ public class UserService {
     /**
      * Get a user by email
      */
+    @Cacheable(value = "users", key = "#email")
     public User getUserByEmail(String email) {
         return userRepository.findByEmail(email)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found"));
@@ -135,4 +140,22 @@ public class UserService {
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found"));
         return user.getGithub();
     }
+
+    @Cacheable(value = "users", key = "#emails.hashCode()")
+    public Map<String, User> getUsersByEmails(Set<String> emails) {
+        if (emails.isEmpty()) return Collections.emptyMap();
+
+        return userRepository.findByEmailIn(new ArrayList<>(emails))
+                .stream()
+                .collect(Collectors.toMap(User::getEmail, Function.identity()));
+    }
+
+    public Map<String, String> getUserNamesByEmails(Set<String> emails) {
+        return getUsersByEmails(emails).entrySet().stream()
+                .collect(Collectors.toMap(
+                        Map.Entry::getKey,
+                        e -> e.getValue().getName())
+                );
+    }
+
 }

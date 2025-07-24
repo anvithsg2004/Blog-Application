@@ -18,7 +18,6 @@ public class SubscriberController {
     @Autowired
     private SubscriberRepository subscriberRepository;
 
-    // Subscribe to a specific author by email
     @PostMapping("/author/email/{authorEmail}")
     public ResponseEntity<?> subscribeToAuthor(@PathVariable String authorEmail) {
         String email = SecurityUtils.getCurrentUserEmail();
@@ -48,7 +47,6 @@ public class SubscriberController {
         }
     }
 
-    // Unsubscribe from a specific author by email
     @DeleteMapping("/author/email/{authorEmail}/unsubscribe")
     public ResponseEntity<?> unsubscribeFromAuthor(@PathVariable String authorEmail) {
         String email = SecurityUtils.getCurrentUserEmail();
@@ -78,7 +76,6 @@ public class SubscriberController {
         }
     }
 
-    // Check subscription status for an author by email
     @GetMapping("/author/email/{authorEmail}/status")
     public ResponseEntity<Map<String, Boolean>> getSubscriptionStatus(@PathVariable String authorEmail) {
         String email = SecurityUtils.getCurrentUserEmail();
@@ -95,7 +92,6 @@ public class SubscriberController {
         return ResponseEntity.ok(response);
     }
 
-    // Error response class
     static class ErrorResponse {
         private String message;
 
@@ -106,13 +102,8 @@ public class SubscriberController {
         public String getMessage() {
             return message;
         }
-
-        public void setMessage(String message) {
-            this.message = message;
-        }
     }
 
-    // Success response class
     static class SuccessResponse {
         private String message;
 
@@ -122,10 +113,6 @@ public class SubscriberController {
 
         public String getMessage() {
             return message;
-        }
-
-        public void setMessage(String message) {
-            this.message = message;
         }
     }
 }

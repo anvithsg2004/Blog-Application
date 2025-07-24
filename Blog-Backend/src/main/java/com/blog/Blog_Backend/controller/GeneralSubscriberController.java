@@ -14,7 +14,6 @@ public class GeneralSubscriberController {
     @Autowired
     private GeneralSubscriberRepository generalSubscriberRepository;
 
-    // Subscribe to general updates
     @PostMapping
     public ResponseEntity<?> subscribe(@RequestBody GeneralSubscriber subscriber) {
         try {
@@ -35,7 +34,6 @@ public class GeneralSubscriberController {
         }
     }
 
-    // Unsubscribe from general updates
     @DeleteMapping("/unsubscribe")
     public ResponseEntity<?> unsubscribe(@RequestParam String email) {
         try {
@@ -53,7 +51,6 @@ public class GeneralSubscriberController {
         }
     }
 
-    // Error response class
     static class ErrorResponse {
         private String message;
 
@@ -64,13 +61,8 @@ public class GeneralSubscriberController {
         public String getMessage() {
             return message;
         }
-
-        public void setMessage(String message) {
-            this.message = message;
-        }
     }
 
-    // Success response class
     static class SuccessResponse {
         private String message;
 
@@ -80,10 +72,6 @@ public class GeneralSubscriberController {
 
         public String getMessage() {
             return message;
-        }
-
-        public void setMessage(String message) {
-            this.message = message;
         }
     }
 }

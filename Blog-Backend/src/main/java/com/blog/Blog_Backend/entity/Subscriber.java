@@ -16,7 +16,8 @@ public class Subscriber {
     @Indexed(unique = true)
     private String email;
 
-    private List<String> subscribedAuthors = new ArrayList<>(); // Stores author emails
+    @Indexed
+    private List<String> subscribedAuthors = new ArrayList<>();
 
     // Getters and setters
     public String getId() {

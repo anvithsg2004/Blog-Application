@@ -14,6 +14,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.util.HashMap;
 import java.util.List;
@@ -37,16 +38,12 @@ public class UserController {
     @Autowired
     private ObjectMapper objectMapper;
 
-    /**
-     * Create user and send OTP
-     */
     @PostMapping(consumes = {"multipart/form-data"})
     public ResponseEntity<Map<String, String>> createUser(
             @RequestPart("user") String userJson,
             @RequestPart(value = "photo", required = false) MultipartFile photo
     ) {
         try {
-            // Deserialize the user JSON string into a User object
             User user = objectMapper.readValue(userJson, User.class);
             if (photo != null) {
                 try {
@@ -61,13 +58,11 @@ public class UserController {
             response.put("email", user.getEmail());
             return new ResponseEntity<>(response, HttpStatus.CREATED);
         } catch (Exception e) {
-            throw new RuntimeException("Failed to create user: " + e.getMessage(), e);
+            logger.error("Failed to create user", e);
+            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Failed to create user");
         }
     }
 
-    /**
-     * Verify OTP
-     */
     @PostMapping("/verify")
     public ResponseEntity<User> verifyOTP(@RequestBody Map<String, String> request) {
         String email = request.get("email");
@@ -79,9 +74,6 @@ public class UserController {
         return ResponseEntity.ok(verifiedUser);
     }
 
-    /**
-     * Resend OTP
-     */
     @PostMapping("/resend-otp")
     public ResponseEntity<Map<String, String>> resendOTP(@RequestBody Map<String, String> request) {
         String email = request.get("email");
@@ -90,7 +82,7 @@ public class UserController {
         }
         User user = userService.getUserByEmail(email);
         if (user.isVerified()) {
-            throw new RuntimeException("User is already verified");
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "User is already verified");
         }
         otpService.sendOTP(email);
         Map<String, String> response = new HashMap<>();
@@ -98,9 +90,6 @@ public class UserController {
         return ResponseEntity.ok(response);
     }
 
-    /**
-     * Update the current user's profile
-     */
     @PutMapping("/profile")
     public ResponseEntity<User> updateUser(@RequestBody User updates) {
         String email = SecurityUtils.getCurrentUserEmail();
@@ -111,9 +100,6 @@ public class UserController {
         return ResponseEntity.ok(updated);
     }
 
-    /**
-     * Change the current user's profile picture
-     */
     @PatchMapping(value = "/profile/photo", consumes = {"multipart/form-data"})
     public ResponseEntity<User> updatePhoto(@RequestPart("photo") MultipartFile photo) {
         String email = SecurityUtils.getCurrentUserEmail();
@@ -124,9 +110,6 @@ public class UserController {
         return ResponseEntity.ok(updated);
     }
 
-    /**
-     * Get the current user's info and their blogs
-     */
     @GetMapping("/profile")
     public ResponseEntity<Map<String, Object>> getUserInfoAndBlogs() {
         String email = SecurityUtils.getCurrentUserEmail();
@@ -143,13 +126,10 @@ public class UserController {
         Map<String, Object> response = new HashMap<>();
         response.put("user", user);
         response.put("blogs", blogs);
-        logger.info("Returning user data: {}", response);
+        logger.info("Returning user data");
         return ResponseEntity.ok(response);
     }
 
-    /**
-     * Get the current user's LinkedIn profile link
-     */
     @GetMapping("/profile/linkedin")
     public ResponseEntity<String> getLinkedInLink() {
         String email = SecurityUtils.getCurrentUserEmail();
@@ -160,9 +140,6 @@ public class UserController {
         return ResponseEntity.ok(link);
     }
 
-    /**
-     * Get the current user's Twitter profile link
-     */
     @GetMapping("/profile/twitter")
     public ResponseEntity<String> getTwitterLink() {
         String email = SecurityUtils.getCurrentUserEmail();
@@ -173,9 +150,6 @@ public class UserController {
         return ResponseEntity.ok(link);
     }
 
-    /**
-     * Get the current user's GitHub profile link
-     */
     @GetMapping("/profile/github")
     public ResponseEntity<String> getGitHubLink() {
         String email = SecurityUtils.getCurrentUserEmail();

@@ -17,7 +17,6 @@ public class NotificationController {
     @Autowired
     private NotificationRepository notificationRepository;
 
-    // Get all notifications for the authenticated user
     @GetMapping
     public ResponseEntity<List<Notification>> getAllNotifications() {
         String email = SecurityUtils.getCurrentUserEmail();
@@ -28,7 +27,6 @@ public class NotificationController {
         return ResponseEntity.ok(notifications);
     }
 
-    // Get unread notifications
     @GetMapping("/unread")
     public ResponseEntity<List<Notification>> getUnreadNotifications() {
         String email = SecurityUtils.getCurrentUserEmail();
@@ -39,7 +37,6 @@ public class NotificationController {
         return ResponseEntity.ok(notifications);
     }
 
-    // Mark all notifications as read
     @PostMapping("/mark-read")
     public ResponseEntity<?> markAllNotificationsAsRead() {
         String email = SecurityUtils.getCurrentUserEmail();
@@ -52,7 +49,6 @@ public class NotificationController {
         return ResponseEntity.ok().build();
     }
 
-    // Mark a single notification as read
     @PostMapping("/{id}/mark-read")
     public ResponseEntity<?> markNotificationAsRead(@PathVariable String id) {
         String email = SecurityUtils.getCurrentUserEmail();
@@ -69,7 +65,6 @@ public class NotificationController {
         return ResponseEntity.ok().build();
     }
 
-    // Delete a single notification
     @DeleteMapping("/{id}")
     public ResponseEntity<?> deleteNotification(@PathVariable String id) {
         String email = SecurityUtils.getCurrentUserEmail();

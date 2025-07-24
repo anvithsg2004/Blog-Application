@@ -8,5 +8,4 @@ import java.util.List;
 public interface BlogPostRepository extends MongoRepository<BlogPost, String> {
 
     List<BlogPost> findByAuthorEmail(String email);
-
 }

@@ -1,21 +1,23 @@
 package com.blog.Blog_Backend.entity;
 
 import org.springframework.data.annotation.Id;
+import org.springframework.data.mongodb.core.index.CompoundIndex;
 import org.springframework.data.mongodb.core.mapping.Document;
 
 import java.time.LocalDateTime;
 
 @Document(collection = "notifications")
+@CompoundIndex(name = "user_read_idx", def = "{'userEmail': 1, 'isRead': 1}")
 public class Notification {
 
     @Id
     private String id;
-    private String userEmail; // Email of the user receiving the notification
-    private String blogId; // ID of the new blog post
-    private String authorEmail; // Email of the author who posted the blog
-    private String blogTitle; // Title of the blog for display
-    private LocalDateTime createdAt; // When the notification was created
-    private boolean isRead; // Whether the user has seen the notification
+    private String userEmail;
+    private String blogId;
+    private String authorEmail;
+    private String blogTitle;
+    private LocalDateTime createdAt;
+    private boolean isRead;
 
     // Getters and setters
     public String getId() {
