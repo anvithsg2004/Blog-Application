@@ -72,16 +72,24 @@ public class UserService {
 
         User existing = userRepository.findByEmail(email)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found"));
+
+        // Prevent OAuth users from setting passwords
+        if ("OAUTH_PASSWORD".equals(existing.getPassword()) && updates.getPassword() != null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "OAuth users cannot set passwords");
+        }
+
         existing.setName(updates.getName());
-        // Hash the password if updated
-        if (updates.getPassword() != null) {
+
+        // Only update password for non-OAuth users
+        if (updates.getPassword() != null && !"OAUTH_PASSWORD".equals(existing.getPassword())) {
             existing.setPassword(passwordEncoder.encode(updates.getPassword()));
         }
+
         existing.setPhone(updates.getPhone());
         existing.setLinkedin(updates.getLinkedin());
         existing.setGithub(updates.getGithub());
         existing.setAbout(updates.getAbout());
-        // do NOT touch existing.setEmail(...)
+
         return userRepository.save(existing);
     }
 

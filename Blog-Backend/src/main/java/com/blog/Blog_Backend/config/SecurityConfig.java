@@ -26,12 +26,26 @@ public class SecurityConfig {
     @Autowired
     private UserDetailsService userDetailsService;
 
+//    private final CustomOAuth2UserService oAuth2UserService;
+//
+//    public SecurityConfig(CustomOAuth2UserService oAuth2UserService) {
+//        this.oAuth2UserService = oAuth2UserService;
+//    }
+
+    private final UnifiedOAuth2UserService unifiedOAuth2UserService;
+
+    public SecurityConfig(UnifiedOAuth2UserService unifiedOAuth2UserService) {
+        this.unifiedOAuth2UserService = unifiedOAuth2UserService;
+    }
+
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
                 .csrf(csrf -> csrf.disable())
                 .authorizeHttpRequests(authorize -> authorize
+                        // OAuth2 end-points themselves are public
+                        .requestMatchers("/login/**", "/oauth2/**").permitAll()
                         // Public endpoints
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/users").permitAll() // Allow registration
@@ -51,17 +65,25 @@ public class SecurityConfig {
                         .anyRequest().permitAll()
                 )
                 .sessionManagement(session -> session
-                        .sessionCreationPolicy(SessionCreationPolicy.STATELESS)
+                        .sessionCreationPolicy(SessionCreationPolicy.IF_REQUIRED)
                 )
                 .userDetailsService(userDetailsService)
-                .httpBasic(Customizer.withDefaults());
+                .httpBasic(Customizer.withDefaults())
+                .oauth2Login(oauth -> oauth
+                        .userInfoEndpoint(ue -> ue
+                                .userService(unifiedOAuth2UserService::loadUser)        // For OAuth2
+                                .oidcUserService(unifiedOAuth2UserService::loadUser)     // For OIDC
+                        )
+                        .defaultSuccessUrl("http://localhost:5173/login?success=oauth", true)
+                        .failureUrl("http://localhost:5173/login?error=oauth_failed")
+                );
         return http.build();
     }
 
     @Bean
     CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration config = new CorsConfiguration();
-         config.setAllowedOrigins(List.of("http://localhost:5173", "https://aidenblog.netlify.app", "https://blogs-backend-fj3b.onrender.com", "https://newblogbackend.onrender.com"));
+        config.setAllowedOrigins(List.of("http://localhost:5173", "https://aidenblog.netlify.app", "https://blogs-backend-fj3b.onrender.com", "https://newblogbackend.onrender.com"));
 //        config.setAllowedOrigins(Arrays.asList("*"));
         config.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS"));
         config.setAllowedHeaders(Arrays.asList("*"));
