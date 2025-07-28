@@ -33,11 +33,9 @@ public class User {
     @LastModifiedDate
     private Date updatedAt;
 
-    // No-args constructor
     public User() {
     }
 
-    // All-args constructor
     public User(String id,
                 String name,
                 String email,
@@ -65,8 +63,6 @@ public class User {
         this.createdAt = createdAt;
         this.updatedAt = updatedAt;
     }
-
-    // Getters and setters
 
     public String getId() {
         return id;

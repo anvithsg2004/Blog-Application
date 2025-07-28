@@ -15,10 +15,9 @@ public class Comment {
     private String content;
     private Date createdAt;
 
-    @JsonManagedReference  // Manages the forward reference to prevent recursion
+    @JsonManagedReference
     private List<Comment> replies = new ArrayList<>();
 
-    // Constructors
     public Comment() {
     }
 
@@ -30,7 +29,6 @@ public class Comment {
         this.replies = replies;
     }
 
-    // Getters and setters
     public String getId() {
         return id;
     }

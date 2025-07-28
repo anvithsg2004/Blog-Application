@@ -8,5 +8,6 @@ import org.springframework.security.oauth2.core.user.OAuth2User;
 
 public interface UnifiedOAuth2UserService {
     OAuth2User loadUser(OAuth2UserRequest request) throws OAuth2AuthenticationException;
+
     OidcUser loadUser(OidcUserRequest request) throws OAuth2AuthenticationException;
 }

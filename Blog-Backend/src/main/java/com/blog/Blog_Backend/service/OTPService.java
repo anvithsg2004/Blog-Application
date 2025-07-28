@@ -21,9 +21,6 @@ public class OTPService {
     private static final int OTP_LENGTH = 4;
     private static final int OTP_EXPIRY_MINUTES = 5;
 
-    /**
-     * Generate a random 4-digit OTP
-     */
     private String generateOTP() {
         SecureRandom random = new SecureRandom();
         StringBuilder otp = new StringBuilder();
@@ -33,20 +30,14 @@ public class OTPService {
         return otp.toString();
     }
 
-    /**
-     * Send OTP to the user's email
-     */
     public void sendOTP(String email) {
-        // Delete any existing OTPs for this email
         otpRepository.deleteByEmail(email);
 
-        // Generate and save new OTP
         String code = generateOTP();
         LocalDateTime now = LocalDateTime.now();
         OTP otp = new OTP(email, code, now, now.plusMinutes(OTP_EXPIRY_MINUTES));
         otpRepository.save(otp);
 
-        // Send OTP email
         String subject = "Verify Your AIDEN Account";
         String htmlContent = "<html>" +
                 "<body style='font-family: Arial, sans-serif; color: #333;'>" +
@@ -60,9 +51,6 @@ public class OTPService {
         emailService.sendEmail(email, subject, htmlContent);
     }
 
-    /**
-     * Verify OTP
-     */
     public boolean verifyOTP(String email, String code) {
         Optional<OTP> otpOpt = otpRepository.findByEmailAndCodeAndUsedFalse(email, code);
         if (otpOpt.isEmpty()) {

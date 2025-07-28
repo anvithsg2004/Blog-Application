@@ -19,7 +19,6 @@ public class Notification {
     private LocalDateTime createdAt;
     private boolean isRead;
 
-    // Getters and setters
     public String getId() {
         return id;
     }

@@ -62,7 +62,6 @@ public class CustomOAuth2UserService implements UnifiedOAuth2UserService {
         String email = oauthUser.getAttribute("email");
         String name = oauthUser.getAttribute("name");
 
-        // GitHub-specific handling
         if ("github".equals(provider)) {
             if (email == null) {
                 email = fetchGitHubEmail(req.getAccessToken().getTokenValue());
@@ -70,15 +69,11 @@ public class CustomOAuth2UserService implements UnifiedOAuth2UserService {
                     email = oauthUser.getAttribute("login") + "@users.noreply.github.com";
                 }
             }
-        }
-        // Google-specific handling
-        else if ("google".equals(provider)) {
-            // Use attributes directly from OIDC response
+        } else if ("google".equals(provider)) {
             Map<String, Object> attributes = oauthUser.getAttributes();
             email = (String) attributes.get("email");
             name = (String) attributes.get("name");
 
-            // Fallback if name isn't available
             if (name == null) {
                 String givenName = oauthUser.getAttribute("given_name");
                 String familyName = oauthUser.getAttribute("family_name");
@@ -91,7 +86,6 @@ public class CustomOAuth2UserService implements UnifiedOAuth2UserService {
             throw new OAuth2AuthenticationException("Email not found in OAuth2 user attributes");
         }
 
-        // Find or create user
         String finalEmail = email;
         String finalName = name;
         User user = userRepo.findByEmail(email).map(existingUser -> {
@@ -109,8 +103,11 @@ public class CustomOAuth2UserService implements UnifiedOAuth2UserService {
 
         logger.info("OAuth user processed: {}", user.getEmail());
 
-        // Return original user object to preserve OIDC info
-        return oauthUser;
+        if (oauthUser instanceof OidcUser) {
+            return new CustomOidcUser(new UserPrincipal(user, oauthUser.getAttributes()), (OidcUser) oauthUser);
+        }
+
+        return new UserPrincipal(user, oauthUser.getAttributes());
     }
 
     private String fetchGitHubEmail(String accessToken) {

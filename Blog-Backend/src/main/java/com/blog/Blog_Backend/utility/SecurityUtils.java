@@ -15,18 +15,14 @@ public class SecurityUtils {
 
         Object principal = auth.getPrincipal();
 
-        // Basic-auth user
         if (principal instanceof UserDetails ud) {
             return ud.getUsername();
         }
 
-        // OAuth2 user
         if (principal instanceof OAuth2User oAuth2User) {
-        /* Google => “email”
-           GitHub => may need to hit the e-mail API or fall back to “login” */
             Object email = oAuth2User.getAttribute("email");
             if (email == null) {
-                email = oAuth2User.getAttribute("login");   // GitHub fallback
+                email = oAuth2User.getAttribute("login");
             }
             return email != null ? email.toString() : null;
         }

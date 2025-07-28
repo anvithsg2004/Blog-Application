@@ -27,11 +27,19 @@ public class BlogPost {
     @LastModifiedDate
     private Date updatedAt;
 
-    // Constructors, getters, setters unchanged
     public BlogPost() {
     }
 
-    public BlogPost(String id, String title, String authorEmail, String content, String codeLanguage, String codeSnippet, byte[] image, List<Comment> comments, Date createdAt, Date updatedAt) {
+    public BlogPost(String id,
+                    String title,
+                    String authorEmail,
+                    String content,
+                    String codeLanguage,
+                    String codeSnippet,
+                    byte[] image,
+                    List<Comment> comments,
+                    Date createdAt,
+                    Date updatedAt) {
         this.id = id;
         this.title = title;
         this.authorEmail = authorEmail;

@@ -4,6 +4,7 @@ import com.blog.Blog_Backend.entity.User;
 import com.blog.Blog_Backend.repository.UserRepository;
 import com.blog.Blog_Backend.utility.SecurityUtils;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.cache.annotation.CachePut;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -28,28 +29,19 @@ public class UserService {
     @Autowired
     private OTPService otpService;
 
-    /**
-     * Create a new user. Photo is optional/nullable.
-     */
     public User createUser(User user) {
-        // Check if email already exists
         if (userRepository.findByEmail(user.getEmail()).isPresent()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Email already registered");
         }
-        // Hash the password before saving
         if (user.getPassword() != null) {
             user.setPassword(passwordEncoder.encode(user.getPassword()));
         }
-        user.setVerified(false); // Set as unverified
+        user.setVerified(false);
         User savedUser = userRepository.save(user);
-        // Send OTP
         otpService.sendOTP(user.getEmail());
         return savedUser;
     }
 
-    /**
-     * Verify user by email
-     */
     public User verifyUser(String email, String otp) {
         if (!otpService.verifyOTP(email, otp)) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid or expired OTP");
@@ -60,11 +52,8 @@ public class UserService {
         return userRepository.save(user);
     }
 
-    /**
-     * Update user (identified by email; email itself cannot be changed)
-     */
+    @CachePut(value = "users", key = "#email")
     public User updateUserByEmail(String email, User updates) {
-        // Check if the current user is authorized to update this profile
         String currentUserEmail = SecurityUtils.getCurrentUserEmail();
         if (currentUserEmail == null || !currentUserEmail.equals(email)) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "You are not authorized to update this user");
@@ -73,14 +62,12 @@ public class UserService {
         User existing = userRepository.findByEmail(email)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found"));
 
-        // Prevent OAuth users from setting passwords
         if ("OAUTH_PASSWORD".equals(existing.getPassword()) && updates.getPassword() != null) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "OAuth users cannot set passwords");
         }
 
         existing.setName(updates.getName());
 
-        // Only update password for non-OAuth users
         if (updates.getPassword() != null && !"OAUTH_PASSWORD".equals(existing.getPassword())) {
             existing.setPassword(passwordEncoder.encode(updates.getPassword()));
         }
@@ -88,16 +75,14 @@ public class UserService {
         existing.setPhone(updates.getPhone());
         existing.setLinkedin(updates.getLinkedin());
         existing.setGithub(updates.getGithub());
+        existing.setTwitter(updates.getTwitter());
         existing.setAbout(updates.getAbout());
 
         return userRepository.save(existing);
     }
 
-    /**
-     * Change only the profile picture (identified by email)
-     */
+    @CachePut(value = "users", key = "#email")
     public User updateProfilePicByEmail(String email, MultipartFile file) {
-        // Check if the current user is authorized to update this profile
         String currentUserEmail = SecurityUtils.getCurrentUserEmail();
         if (currentUserEmail == null || !currentUserEmail.equals(email)) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "You are not authorized to update this user");
@@ -113,36 +98,24 @@ public class UserService {
         return userRepository.save(existing);
     }
 
-    /**
-     * Get a user by email
-     */
     @Cacheable(value = "users", key = "#email")
     public User getUserByEmail(String email) {
         return userRepository.findByEmail(email)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found"));
     }
 
-    /**
-     * Get a user's LinkedIn profile link by email
-     */
     public String getLinkedInLinkByEmail(String email) {
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found"));
         return user.getLinkedin();
     }
 
-    /**
-     * Get a user's Twitter profile link by email
-     */
     public String getTwitterLinkByEmail(String email) {
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found"));
         return user.getTwitter();
     }
 
-    /**
-     * Get a user's GitHub profile link by email
-     */
     public String getGitHubLinkByEmail(String email) {
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found"));

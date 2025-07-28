@@ -15,7 +15,6 @@ public class OTP {
     private LocalDateTime expiresAt;
     private boolean used;
 
-    // Constructors
     public OTP() {
     }
 
@@ -27,7 +26,6 @@ public class OTP {
         this.used = false;
     }
 
-    // Getters and setters
     public String getId() {
         return id;
     }

@@ -13,7 +13,6 @@ public class GeneralSubscriber {
     @Indexed(unique = true)
     private String email;
 
-    // Getters and setters
     public String getId() {
         return id;
     }

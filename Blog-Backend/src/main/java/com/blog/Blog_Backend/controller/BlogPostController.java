@@ -104,16 +104,13 @@ public class BlogPostController {
     public ResponseEntity<List<Map<String, Object>>> getAllBlogs() {
         List<BlogPost> blogs = service.getAllBlogs();
 
-        // Batch fetch all authors - single query
         Set<String> authorEmails = blogs.stream()
                 .map(BlogPost::getAuthorEmail)
                 .collect(Collectors.toSet());
         Map<String, User> authors = userService.getUsersByEmails(authorEmails);
 
-        // Pre-cache Base64 encoded images (optimized with caching in service)
         Map<String, String> encodedImages = service.getEncodedImages(blogs); // New method for cached encoding
 
-        // Build response using cached data
         List<Map<String, Object>> response = new ArrayList<>(blogs.size());
         for (BlogPost blog : blogs) {
             Map<String, Object> blogData = new HashMap<>(12);
@@ -148,16 +145,13 @@ public class BlogPostController {
     public ResponseEntity<Map<String, Object>> getBlogById(@PathVariable String blogId) {
         BlogPost blog = service.getBlogById(blogId);
 
-        // Batch fetch all authors (blog + comments) - single query
         Set<String> allAuthorEmails = service.extractAuthorEmailsFromComments(blog.getComments());
         allAuthorEmails.add(blog.getAuthorEmail());
         Map<String, User> authors = userService.getUsersByEmails(allAuthorEmails);
 
-        // Pre-cache author names
         Map<String, String> emailToNameMap = authors.entrySet().stream()
                 .collect(Collectors.toMap(Map.Entry::getKey, e -> e.getValue().getName()));
 
-        // Build response
         Map<String, Object> response = new HashMap<>(16);
         response.put("id", blog.getId());
         response.put("title", blog.getTitle());
@@ -184,7 +178,6 @@ public class BlogPostController {
         authorInfo.put("twitter", author.getTwitter());
         response.put("author", authorInfo);
 
-        // Transform comments with batched names
         response.put("comments", service.transformCommentsWithNames(blog.getComments(), emailToNameMap));
 
         return ResponseEntity.ok(response);

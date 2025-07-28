@@ -21,7 +21,7 @@ public class AppConfig {
     @Bean(name = "taskExecutor")
     public TaskExecutor taskExecutor() {
         ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();
-        executor.setCorePoolSize(20); // Increased for better concurrency
+        executor.setCorePoolSize(20);
         executor.setMaxPoolSize(50);
         executor.setQueueCapacity(200);
         executor.setThreadNamePrefix("Async-");

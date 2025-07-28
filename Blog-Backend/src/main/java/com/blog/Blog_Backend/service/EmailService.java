@@ -46,7 +46,6 @@ public class EmailService {
     @Autowired
     public EmailService(JavaMailSender mailSender) {
         this.mailSender = mailSender;
-        // Add timeout properties programmatically
         if (mailSender instanceof JavaMailSenderImpl) {
             JavaMailSenderImpl impl = (JavaMailSenderImpl) mailSender;
             impl.getJavaMailProperties().setProperty("mail.smtp.connectiontimeout", "10000");
@@ -55,7 +54,6 @@ public class EmailService {
         }
     }
 
-    // Add separate authentication handling
     private void configureMailSession() {
         if (mailSender instanceof JavaMailSenderImpl) {
             JavaMailSenderImpl impl = (JavaMailSenderImpl) mailSender;
@@ -69,22 +67,18 @@ public class EmailService {
         logger.info("⏳ Sending notifications for new blog: {}", blogTitle);
         List<Notification> notifications = new ArrayList<>();
 
-        // Process author-specific subscribers
         List<Subscriber> authorSubscribers = subscriberRepository.findBySubscribedAuthorsContaining(authorEmail);
         for (Subscriber subscriber : authorSubscribers) {
             notifications.add(createNotification(blogTitle, blogId, authorEmail, subscriber.getEmail()));
         }
 
-        // Process general subscribers
         List<GeneralSubscriber> generalSubscribers = generalSubscriberRepository.findAll();
         for (GeneralSubscriber subscriber : generalSubscribers) {
             notifications.add(createNotification(blogTitle, blogId, authorEmail, subscriber.getEmail()));
         }
 
-        // Batch save notifications
         notificationRepository.saveAll(notifications);
 
-        // Send emails asynchronously
         for (Subscriber subscriber : authorSubscribers) {
             sendEmailAsync(
                     subscriber.getEmail(),
@@ -108,22 +102,18 @@ public class EmailService {
     public void sendUpdatedBlogNotification(String blogTitle, String blogId, String authorEmail) {
         List<Notification> notifications = new ArrayList<>();
 
-        // Process author-specific subscribers
         List<Subscriber> authorSubscribers = subscriberRepository.findBySubscribedAuthorsContaining(authorEmail);
         for (Subscriber subscriber : authorSubscribers) {
             notifications.add(createNotification(blogTitle, blogId, authorEmail, subscriber.getEmail()));
         }
 
-        // Process general subscribers
         List<GeneralSubscriber> generalSubscribers = generalSubscriberRepository.findAll();
         for (GeneralSubscriber subscriber : generalSubscribers) {
             notifications.add(createNotification(blogTitle, blogId, authorEmail, subscriber.getEmail()));
         }
 
-        // Batch save notifications
         notificationRepository.saveAll(notifications);
 
-        // Send emails asynchronously
         for (Subscriber subscriber : authorSubscribers) {
             sendEmailAsync(
                     subscriber.getEmail(),
@@ -141,7 +131,6 @@ public class EmailService {
         }
     }
 
-    // In EmailService.java
     @Async
     public void sendEmailAsync(String to, String subject, String htmlContent) {
         MimeMessage message = mailSender.createMimeMessage();

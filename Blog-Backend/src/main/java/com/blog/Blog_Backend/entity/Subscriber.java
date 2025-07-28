@@ -19,7 +19,6 @@ public class Subscriber {
     @Indexed
     private List<String> subscribedAuthors = new ArrayList<>();
 
-    // Getters and setters
     public String getId() {
         return id;
     }
