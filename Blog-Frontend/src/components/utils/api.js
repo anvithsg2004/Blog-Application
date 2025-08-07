@@ -1,82 +1,42 @@
+import authService from '../../services/authService';
+
 // const API_BASE_URL = "http://localhost:8080";
 
 const API_BASE_URL = "https://blogs-backend-w9x0.onrender.com";
 
-// Function to get the Base64-encoded credentials from localStorage
-const getAuthCredentials = () => {
-    return localStorage.getItem("authCredentials");
-};
-
-// Generic fetch function with authentication
+/**
+ * Enhanced API fetch function that works with both OAuth and Basic Auth
+ */
 const apiFetch = async (url, options = {}) => {
-    const authCredentials = getAuthCredentials();
-    const headers = new Headers(options.headers || {});
-
-    if (!(options.body instanceof FormData) && !headers.has("Content-Type")) {
-        headers.set("Content-Type", "application/json");
-    }
-
-    if (authCredentials) {
-        headers.set("Authorization", `Basic ${authCredentials}`);
-        console.log("Authorization header size:", `Basic ${authCredentials}`.length);
-    }
-
     try {
-        const response = await fetch(`${API_BASE_URL}${url}`, {
-            ...options,
-            headers,
-        });
-
-        if (!response.ok) {
-            const errorData = await response.json().catch(() => ({}));
-            throw new Error(errorData.message || response.statusText);
-        }
-
-        return response;
+        // Use the auth service for authenticated requests
+        return await authService.authenticatedFetch(url, options);
     } catch (error) {
         console.error(`API fetch error for ${url}:`, error);
         throw error;
     }
 };
 
-// Export API methods
+/**
+ * Legacy functions for backward compatibility
+ * These now use the unified auth service
+ */
 export const registerUser = async (formData) => {
-    const response = await apiFetch("/api/users", {
-        method: "POST",
-        body: formData,
-    });
-    return response.json();
+    return await authService.registerUser(formData);
 };
 
 export const verifyOTP = async (email, otp) => {
-    const response = await apiFetch("/api/users/verify", {
-        method: "POST",
-        body: JSON.stringify({ email, otp }),
-    });
-    return response.json();
+    return await authService.verifyOTP(email, otp);
 };
 
 export const resendOTP = async (email) => {
-    const response = await apiFetch("/api/users/resend-otp", {
-        method: "POST",
-        body: JSON.stringify({ email }),
-    });
-    return response.json();
+    return await authService.resendOTP(email);
 };
 
 export const loginUser = async (email, password) => {
-    const credentials = btoa(`${email}:${password}`);
-    const response = await apiFetch("/api/users/profile", {
-        method: "GET",
-        headers: {
-            "Authorization": `Basic ${credentials}`,
-        },
-    });
-
-    // If successful, store the credentials
-    localStorage.setItem("authCredentials", credentials);
-    return response.json();
+    const result = await authService.loginWithCredentials(email, password);
+    return result.user;
 };
 
-// Export the fetch function for other components to use
+// Export the enhanced fetch function as default
 export default apiFetch;

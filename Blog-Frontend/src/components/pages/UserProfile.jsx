@@ -4,11 +4,11 @@ import { Button } from "../ui/button";
 import { useToast } from "../../hooks/use-toast";
 import BlogCard from "../BlogCard";
 import { Link, useNavigate } from "react-router-dom";
-import apiFetch from "../utils/api";
 import { AuthContext } from "../AuthContext";
+import authService from "../../services/authService";
 
 const UserProfile = () => {
-    const { user, isLoggedIn } = useContext(AuthContext);
+    const { user, isLoggedIn, authMethod, refreshUser } = useContext(AuthContext);
     const [userData, setUserData] = useState(null);
     const [isEditing, setIsEditing] = useState(false);
     const [editedData, setEditedData] = useState({});
@@ -22,7 +22,8 @@ const UserProfile = () => {
 
     useEffect(() => {
         const fetchUserData = async () => {
-            console.log("UserProfile: isLoggedIn:", isLoggedIn, "user:", user);
+            console.log("UserProfile: isLoggedIn:", isLoggedIn, "user:", user, "authMethod:", authMethod);
+
             if (!isLoggedIn) {
                 console.log("UserProfile: Not logged in, redirecting to /login");
                 navigate("/login");
@@ -31,11 +32,8 @@ const UserProfile = () => {
 
             try {
                 setLoading(true);
-                const response = await apiFetch("/api/users/profile", {
+                const response = await authService.authenticatedFetch("/api/users/profile", {
                     method: "GET",
-                    headers: {
-                        Authorization: `Basic ${localStorage.getItem("authCredentials")}`,
-                    },
                 });
 
                 if (!response.ok) {
@@ -98,7 +96,7 @@ const UserProfile = () => {
         };
 
         fetchUserData();
-    }, [isLoggedIn, navigate, toast, user]);
+    }, [isLoggedIn, navigate, toast, user, authMethod]);
 
     const handleEditToggle = () => {
         if (isEditing) {
@@ -149,6 +147,7 @@ const UserProfile = () => {
 
     const handleSaveChanges = async () => {
         try {
+            // OAuth users cannot change passwords, so exclude it from updates
             const updatedUser = {
                 name: editedData.name,
                 phone: editedData.phone,
@@ -159,10 +158,14 @@ const UserProfile = () => {
                 location: editedData.location,
             };
 
-            await apiFetch("/api/users/profile", {
+            // Only include password for Basic Auth users, and only if they're not OAuth users
+            if (authMethod === 'basic' && editedData.password && userData.password !== "OAUTH_PASSWORD") {
+                updatedUser.password = editedData.password;
+            }
+
+            await authService.authenticatedFetch("/api/users/profile", {
                 method: "PUT",
                 headers: {
-                    Authorization: `Basic ${localStorage.getItem("authCredentials")}`,
                     "Content-Type": "application/json",
                 },
                 body: JSON.stringify(updatedUser),
@@ -171,11 +174,8 @@ const UserProfile = () => {
             if (selectedFile) {
                 const formData = new FormData();
                 formData.append("photo", selectedFile);
-                await apiFetch("/api/users/profile/photo", {
+                await authService.authenticatedFetch("/api/users/profile/photo", {
                     method: "PATCH",
-                    headers: {
-                        Authorization: `Basic ${localStorage.getItem("authCredentials")}`,
-                    },
                     body: formData,
                 });
                 toast({
@@ -185,11 +185,9 @@ const UserProfile = () => {
                 });
             }
 
-            const response = await apiFetch("/api/users/profile", {
+            // Refresh user data
+            const response = await authService.authenticatedFetch("/api/users/profile", {
                 method: "GET",
-                headers: {
-                    Authorization: `Basic ${localStorage.getItem("authCredentials")}`,
-                },
             });
             const data = await response.json();
             const userInfo = data.user;
@@ -212,6 +210,9 @@ const UserProfile = () => {
             setIsEditing(false);
             setSelectedFile(null);
 
+            // Refresh auth context
+            await refreshUser();
+
             toast({
                 title: "Profile updated",
                 description: "Your profile information has been saved.",
@@ -219,9 +220,15 @@ const UserProfile = () => {
             });
         } catch (error) {
             console.error("Error updating profile:", error);
+
+            let errorMessage = "Failed to update profile.";
+            if (error.message.includes("OAuth users cannot set passwords")) {
+                errorMessage = "OAuth users cannot change passwords. Other changes have been saved.";
+            }
+
             toast({
                 title: "Error",
-                description: "Failed to update profile.",
+                description: errorMessage,
                 variant: "destructive",
             });
         }
@@ -230,11 +237,8 @@ const UserProfile = () => {
     const handleDeleteBlog = async (blogId) => {
         if (window.confirm("Are you sure you want to delete this blog post? This action cannot be undone.")) {
             try {
-                const response = await apiFetch(`/api/blogs/${blogId}`, {
+                const response = await authService.authenticatedFetch(`/api/blogs/${blogId}`, {
                     method: "DELETE",
-                    headers: {
-                        Authorization: `Basic ${localStorage.getItem("authCredentials")}`,
-                    },
                 });
 
                 if (!response.ok) {
@@ -277,6 +281,8 @@ const UserProfile = () => {
         return null;
     }
 
+    const isOAuthUser = authMethod === 'oauth' || userData?.password === "OAUTH_PASSWORD";
+
     return (
         <div className="pt-20 min-h-screen bg-black">
             <div className="max-w-7xl mx-auto py-16 px-4 sm:px-6 lg:px-8">
@@ -286,6 +292,11 @@ const UserProfile = () => {
                     </h1>
                     <p className="text-[rgba(229,228,226,0.8)] max-w-3xl">
                         Manage your personal information and view your published content
+                        {isOAuthUser && (
+                            <span className="block mt-2 text-sm font-semibold">
+                                ✨ Signed in with {authMethod === 'oauth' ? 'OAuth' : 'Social Login'} - No password management needed
+                            </span>
+                        )}
                     </p>
                 </div>
 
@@ -328,7 +339,13 @@ const UserProfile = () => {
                                 <h2 className="text-2xl font-['Space_Grotesk'] font-bold tracking-[-1px] mb-1">
                                     {editedData.name || "User"}
                                 </h2>
-                                <p className="text-[rgba(229,228,226,0.8)] mb-6">{editedData.email || "No email"}</p>
+                                <p className="text-[rgba(229,228,226,0.8)] mb-2">{editedData.email || "No email"}</p>
+
+                                {isOAuthUser && (
+                                    <div className="mb-4 px-3 py-1 bg-[rgba(229,228,226,0.1)] border border-[rgba(229,228,226,0.3)] text-xs text-[rgba(229,228,226,0.8)]">
+                                        OAuth Account
+                                    </div>
+                                )}
 
                                 {isEditing && (
                                     <div className="w-full grid gap-4 mt-4">
@@ -408,6 +425,18 @@ const UserProfile = () => {
                                         isEditing={false}
                                         disabled={true}
                                     />
+
+                                    {!isOAuthUser && (
+                                        <ProfileField
+                                            label="Password"
+                                            value=""
+                                            name="password"
+                                            type="password"
+                                            isEditing={isEditing}
+                                            onChange={handleInputChange}
+                                            placeholder="Leave blank to keep current password"
+                                        />
+                                    )}
 
                                     <ProfileField
                                         label="Phone Number"
@@ -532,22 +561,23 @@ const UserProfile = () => {
     );
 };
 
-const ProfileField = ({ label, value, name, isEditing, onChange, disabled = false }) => (
+const ProfileField = ({ label, value, name, type = "text", isEditing, onChange, disabled = false, placeholder }) => (
     <div className="grid gap-2">
         <label className="uppercase text-xs tracking-[1px] text-[#E5E4E2]">{label}</label>
         {isEditing && !disabled ? (
             <input
-                type="text"
+                type={type}
                 name={name}
                 value={value || ""}
                 onChange={onChange}
                 disabled={disabled}
+                placeholder={placeholder}
                 className={`w-full p-4 bg-black border border-[rgba(229,228,226,0.5)] text-white outline-none transition-brutal ${disabled ? "opacity-60 cursor-not-allowed" : "focus:border-white"
                     }`}
             />
         ) : (
             <p className={`text-white/85 border border-transparent p-4 ${disabled ? "opacity-60" : ""}`}>
-                {value || "Not specified"}
+                {type === "password" ? "••••••••" : (value || "Not specified")}
             </p>
         )}
         {name === "email" && isEditing && (

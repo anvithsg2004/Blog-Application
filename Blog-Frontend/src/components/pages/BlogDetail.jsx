@@ -28,12 +28,7 @@ const BlogDetail = () => {
     useEffect(() => {
         const fetchBlogAndSubscription = async () => {
             try {
-                const blogResponse = await apiFetch(`/api/blogs/${id}`, {
-                    method: "GET",
-                    headers: {
-                        "Authorization": `Basic ${localStorage.getItem("authCredentials")}`,
-                    },
-                });
+                const blogResponse = await apiFetch(`/api/blogs/${id}`);
                 if (!blogResponse.ok) {
                     if (blogResponse.status === 401) {
                         localStorage.setItem("redirectAfterLogin", `/blog/${id}`);
@@ -43,6 +38,9 @@ const BlogDetail = () => {
                     throw new Error("Failed to fetch blog");
                 }
                 const data = await blogResponse.json();
+
+                console.log("DEBUG: Raw API dates - createdAt:", data.createdAt, "updatedAt:", data.updatedAt);
+
                 console.log("Blog API Response:", data);
                 setBlog({
                     id: data.id,
@@ -77,12 +75,7 @@ const BlogDetail = () => {
                 }
 
                 console.log("Fetching subscription status for author email:", data.authorEmail);
-                const subscriptionResponse = await apiFetch(`/api/subscribers/author/email/${encodeURIComponent(data.authorEmail)}/status`, {
-                    method: "GET",
-                    headers: {
-                        "Authorization": `Basic ${localStorage.getItem("authCredentials")}`,
-                    },
-                });
+                const subscriptionResponse = await apiFetch(`/api/subscribers/author/email/${encodeURIComponent(data.authorEmail)}/status`);
                 if (subscriptionResponse.ok) {
                     const subscriptionData = await subscriptionResponse.json();
                     setIsSubscribed(subscriptionData.isSubscribed);
@@ -344,10 +337,7 @@ const BlogDetail = () => {
 
             const response = await apiFetch(endpoint, {
                 method,
-                headers: {
-                    "Authorization": `Basic ${localStorage.getItem("authCredentials")}`,
-                    "Content-Type": method === "POST" ? "application/json" : undefined,
-                },
+                body: method === "POST" ? JSON.stringify({}) : undefined,
             });
 
             if (!response.ok) {
@@ -595,31 +585,28 @@ const BlogDetail = () => {
                     </div>
                 )}
 
-                <div className="mt-8 mb-12">
-                    <h3 className="text-xl font-['Space_Grotesk'] font-bold text-white mb-4">
-                        Publication Dates
-                    </h3>
-                    <div className="text-[rgba(229,228,226,0.8)]">
+                {(blog.createdAt || blog.updatedAt) && (
+                    <div className="text-[rgba(229,228,226,0.8)] mb-8 text-sm">
                         <p>
-                            <span className="font-bold">Published:</span>{' '}
-                            {blog.createdAt ? new Date(blog.createdAt).toLocaleDateString('en-US', {
+                            Published: {blog.createdAt ? new Date(blog.createdAt).toLocaleDateString('en-US', {
                                 month: 'short',
                                 day: 'numeric',
                                 year: 'numeric'
-                            }) : 'Unknown'}
+                            }) : ''}
                         </p>
-                        {blog.updatedAt && blog.createdAt && new Date(blog.updatedAt).getTime() !== new Date(blog.createdAt).getTime() && (
-                            <p>
-                                <span className="font-bold">Updated:</span>{' '}
-                                {new Date(blog.updatedAt).toLocaleDateString('en-US', {
-                                    month: 'short',
-                                    day: 'numeric',
-                                    year: 'numeric'
-                                })}
-                            </p>
-                        )}
+                        {blog.updatedAt &&
+                            blog.createdAt &&
+                            new Date(blog.updatedAt).getTime() !== new Date(blog.createdAt).getTime() && (
+                                <p>
+                                    Updated: {new Date(blog.updatedAt).toLocaleDateString('en-US', {
+                                        month: 'short',
+                                        day: 'numeric',
+                                        year: 'numeric'
+                                    })}
+                                </p>
+                            )}
                     </div>
-                </div>
+                )}
 
                 <div className="mt-16 pt-8 border-t border-[rgba(229,228,226,0.3)]">
                     <div className="flex flex-col md:flex-row items-center md:items-start gap-6">

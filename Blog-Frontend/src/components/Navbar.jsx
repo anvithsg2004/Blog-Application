@@ -25,12 +25,10 @@ const Navbar = () => {
     if (isLoggedIn && !loading) {
       const fetchNotifications = async () => {
         try {
-          const response = await apiFetch("/api/notifications", {
-            method: "GET",
-            headers: {
-              Authorization: `Basic ${localStorage.getItem("authCredentials")}`,
-            },
-          });
+          // THIS IS THE FIX: The manual 'headers' object has been removed.
+          // Your 'apiFetch' service now handles authentication automatically.
+          const response = await apiFetch("/api/notifications");
+
           if (response.ok) {
             const data = await response.json();
             setNotifications(data);
@@ -94,20 +92,14 @@ const Navbar = () => {
 
   const handleNotificationItemClick = async (notification) => {
     try {
-      // Mark the specific notification as read
+      // FIX #2: Removed the manual 'headers' object here.
       await apiFetch(`/api/notifications/${notification.id}/mark-read`, {
         method: "POST",
-        headers: {
-          Authorization: `Basic ${localStorage.getItem("authCredentials")}`,
-        },
       });
 
-      // Delete the notification
+      // FIX #3: Removed the manual 'headers' object here.
       await apiFetch(`/api/notifications/${notification.id}`, {
         method: "DELETE",
-        headers: {
-          Authorization: `Basic ${localStorage.getItem("authCredentials")}`,
-        },
       });
 
       // Update local state to remove the notification

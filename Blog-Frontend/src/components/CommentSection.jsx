@@ -15,12 +15,8 @@ const CommentSection = ({ blogId }) => {
     useEffect(() => {
         const fetchComments = async () => {
             try {
-                const response = await apiFetch(`/api/blogs/${blogId}`, {
-                    method: 'GET',
-                    headers: {
-                        'Authorization': `Basic ${localStorage.getItem('authCredentials')}`,
-                    },
-                });
+                // FIX #1: REMOVED headers object
+                const response = await apiFetch(`/api/blogs/${blogId}`);
                 if (!response.ok) {
                     throw new Error('Failed to fetch comments');
                 }
@@ -42,12 +38,9 @@ const CommentSection = ({ blogId }) => {
         }
 
         try {
+            // FIX #2: REMOVED headers object
             const response = await apiFetch(`/api/blogs/${blogId}/comments`, {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Basic ${localStorage.getItem('authCredentials')}`,
-                },
                 body: JSON.stringify({ content }),
             });
             if (!response.ok) {
@@ -68,12 +61,9 @@ const CommentSection = ({ blogId }) => {
         }
 
         try {
+            // FIX #3: REMOVED headers object
             const response = await apiFetch(`/api/blogs/${blogId}/comments/${commentId}/replies`, {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Basic ${localStorage.getItem('authCredentials')}`,
-                },
                 body: JSON.stringify({ content }),
             });
             if (!response.ok) {
@@ -88,11 +78,9 @@ const CommentSection = ({ blogId }) => {
 
     const handleDeleteComment = async (commentId) => {
         try {
+            // FIX #4: REMOVED headers object
             const response = await apiFetch(`/api/blogs/${blogId}/comments/${commentId}`, {
                 method: 'DELETE',
-                headers: {
-                    'Authorization': `Basic ${localStorage.getItem('authCredentials')}`,
-                },
             });
             if (!response.ok) {
                 throw new Error('Failed to delete comment');
@@ -106,11 +94,9 @@ const CommentSection = ({ blogId }) => {
 
     const handleDeleteReply = async (commentId, replyId) => {
         try {
+            // FIX #5: REMOVED headers object
             const response = await apiFetch(`/api/blogs/${blogId}/comments/${commentId}/replies/${replyId}`, {
                 method: 'DELETE',
-                headers: {
-                    'Authorization': `Basic ${localStorage.getItem('authCredentials')}`,
-                },
             });
             if (!response.ok) {
                 throw new Error('Failed to delete reply');

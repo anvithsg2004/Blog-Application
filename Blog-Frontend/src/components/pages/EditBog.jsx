@@ -24,12 +24,7 @@ const EditBlog = () => {
         const fetchBlog = async () => {
             setIsLoading(true);
             try {
-                const response = await apiFetch(`/api/blogs/${id}`, {
-                    method: "GET",
-                    headers: {
-                        Authorization: `Basic ${localStorage.getItem("authCredentials")}`,
-                    },
-                });
+                const response = await apiFetch(`/api/blogs/${id}`);
                 if (!response.ok) {
                     if (response.status === 401) {
                         localStorage.setItem("redirectAfterLogin", `/blogs/edit/${id}`);
@@ -119,9 +114,6 @@ const EditBlog = () => {
 
             const response = await apiFetch("/api/blogs", {
                 method: "PUT",
-                headers: {
-                    Authorization: `Basic ${localStorage.getItem("authCredentials")}`,
-                },
                 body: formData,
             });
 
