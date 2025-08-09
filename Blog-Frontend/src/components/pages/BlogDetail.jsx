@@ -8,6 +8,7 @@ import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import apiFetch from "../utils/api";
 import { marked } from "marked";
 import DOMPurify from "dompurify";
+const HF_API_KEY = import.meta.env.VITE_HF_API_KEY;
 
 const BlogDetail = () => {
     const { id } = useParams();
@@ -138,7 +139,7 @@ const BlogDetail = () => {
             const response = await fetch('https://api-inference.huggingface.co/models/facebook/bart-large-cnn', {
                 method: 'POST',
                 headers: {
-                    'Authorization': `Bearer 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`,
+                    'Authorization': `Bearer ${HF_API_KEY}`,
                     'Content-Type': 'application/json',
                 },
                 body: JSON.stringify({
