@@ -72,8 +72,8 @@ public class SecurityConfig {
                                 .userService(unifiedOAuth2UserService::loadUser)
                                 .oidcUserService(unifiedOAuth2UserService::loadUser)
                         )
-                        .defaultSuccessUrl("http://localhost:5173/login?success=oauth", true)
-                        .failureUrl("http://localhost:5173/login?error=oauth_failed")
+                        .defaultSuccessUrl("https://aidenblog.netlify.app/login?success=oauth", true)
+                        .failureUrl("https://aidenblog.netlify.app/login?error=oauth_failed")
                 );
         return http.build();
     }
@@ -84,6 +84,7 @@ public class SecurityConfig {
         config.setAllowedOrigins(List.of("http://localhost:5173",
                 "https://aidenblog.netlify.app",
                 "https://blogs-backend-fj3b.onrender.com",
+                "https://blogs-backend-w9x0.onrender.com",
                 "https://newblogbackend.onrender.com"));
         config.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"));
         config.setAllowedHeaders(Arrays.asList("*"));
