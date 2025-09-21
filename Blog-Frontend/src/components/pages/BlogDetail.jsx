@@ -165,7 +165,7 @@ const BlogDetail = () => {
                     const retryResponse = await fetch('https://api-inference.huggingface.co/models/facebook/bart-large-cnn', {
                         method: 'POST',
                         headers: {
-                            'Authorization': `Bearer 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`,
+                            'Authorization': `Bearer ${HF_API_KEY}`,
                             'Content-Type': 'application/json',
                         },
                         body: JSON.stringify({
@@ -274,7 +274,7 @@ const BlogDetail = () => {
             const response = await fetch('https://api-inference.huggingface.co/models/deepset/roberta-base-squad2', {
                 method: 'POST',
                 headers: {
-                    'Authorization': `Bearer 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`,
+                    'Authorization': `Bearer ${HF_API_KEY}`,
                     'Content-Type': 'application/json',
                 },
                 body: JSON.stringify({
