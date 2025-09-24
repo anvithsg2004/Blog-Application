@@ -8,7 +8,7 @@ import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import apiFetch from "../utils/api";
 import { marked } from "marked";
 import DOMPurify from "dompurify";
-
+const HF_API_KEY = import.meta.env.VITE_HF_API_KEY;
 
 const BlogDetail = () => {
     const { id } = useParams();
@@ -123,6 +123,7 @@ const BlogDetail = () => {
                 .replace(/["'`]/g, '"');
 
             const inputWords = fullContent.split(' ');
+            const estimatedTokens = inputWords.length * 1.3;
             const maxTokens = 800;
             const maxWords = Math.floor(maxTokens / 1.3);
             const truncatedContent = inputWords.length > maxWords ? inputWords.slice(0, maxWords).join(' ') : fullContent;
@@ -135,13 +136,19 @@ const BlogDetail = () => {
             console.log('Content to summarize:', contentToSummarize);
             console.log('Estimated tokens:', contentToSummarize.split(' ').length * 1.3);
 
-            // Call Netlify Function proxy (server handles CORS and HF token)
-            const response = await fetch('/.netlify/functions/gemini-summarize', {
+            const response = await fetch('https://api-inference.huggingface.co/models/deepset/roberta-base-squad2', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: {
+                    'Authorization': `Bearer ${HF_API_KEY}`,
+                    'Content-Type': 'application/json',
+                },
                 body: JSON.stringify({
                     inputs: contentToSummarize,
-                    parameters: { min_length: 50, max_length: 1000, do_sample: false },
+                    parameters: {
+                        min_length: 50,
+                        max_length: 1000,
+                        do_sample: false,
+                    },
                 }),
             });
 
@@ -149,10 +156,51 @@ const BlogDetail = () => {
                 if (response.status === 400) {
                     const errorData = await response.json();
                     throw new Error(errorData.error || 'Invalid input for summarization. The content may be too long or contain unsupported characters.');
+                } else if (response.status === 401) {
+                    throw new Error('Authentication failed. Please check your API key.');
                 } else if (response.status === 429) {
                     throw new Error('Rate limit reached. Please try again later.');
                 } else if (response.status === 503) {
-                    throw new Error('Model loading timed out. Please try again in a moment.');
+                    await new Promise(resolve => setTimeout(resolve, 5000));
+                    const retryResponse = await fetch('https://api-inference.huggingface.co/models/deepset/roberta-base-squad2', {
+                        method: 'POST',
+                        headers: {
+                            'Authorization': `Bearer ${HF_API_KEY}`,
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({
+                            inputs: contentToSummarize,
+                            parameters: {
+                                min_length: 50,
+                                max_length: 1000,
+                                do_sample: false,
+                            },
+                        }),
+                    });
+                    if (!retryResponse.ok) {
+                        throw new Error('Model loading failed after retry. Please try again later.');
+                    }
+                    const retryResult = await retryResponse.json();
+                    const fullSummary = retryResult[0].summary_text;
+                    if (!fullSummary) {
+                        throw new Error('No summary returned from the API.');
+                    }
+                    const retrySummaryWords = fullSummary.split(' ');
+                    let currentSummary = '';
+                    let index = 0;
+
+                    const streamSummary = () => {
+                        if (index < retrySummaryWords.length) {
+                            currentSummary += (index > 0 ? ' ' : '') + retrySummaryWords[index];
+                            setSummary(currentSummary);
+                            index++;
+                            setTimeout(streamSummary, 50);
+                        } else {
+                            setIsSummarizing(false);
+                        }
+                    };
+                    streamSummary();
+                    return;
                 } else {
                     throw new Error('Failed to summarize the blog post.');
                 }
@@ -223,13 +271,17 @@ const BlogDetail = () => {
                 throw new Error('Blog content is empty after processing.');
             }
 
-            // Call Netlify Function proxy (server handles CORS and HF token)
-            const response = await fetch('/.netlify/functions/gemini-qa', {
+            const response = await fetch('https://api-inference.huggingface.co/models/deepset/roberta-base-squad2', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: {
+                    'Authorization': `Bearer ${HF_API_KEY}`,
+                    'Content-Type': 'application/json',
+                },
                 body: JSON.stringify({
-                    question: question.trim(),
-                    context: contentToAnswer,
+                    inputs: {
+                        question: question.trim(),
+                        context: contentToAnswer,
+                    },
                 }),
             });
 
@@ -237,10 +289,12 @@ const BlogDetail = () => {
                 if (response.status === 400) {
                     const errorData = await response.json();
                     throw new Error(errorData.error || 'Invalid input for question answering.');
+                } else if (response.status === 401) {
+                    throw new Error('Authentication failed. Please check your API key.');
                 } else if (response.status === 429) {
                     throw new Error('Rate limit reached. Please try again later.');
                 } else if (response.status === 503) {
-                    throw new Error('Model loading timed out. Please try again in a moment.');
+                    throw new Error('Model is loading. Please try again later.');
                 } else {
                     throw new Error('Failed to process the question.');
                 }
@@ -374,12 +428,12 @@ const BlogDetail = () => {
 
                 <header className="mb-12">
                     <div className="uppercase text-xs leading-tight tracking-[1px] text-[rgba(229,228,226,0.6)] mb-4">
-                        {author?.name}
+                        {author.name}
                     </div>
                     <h1 className="text-4xl md:text-5xl font-['Space_Grotesk'] font-bold tracking-[-1px] text-white mb-8">
-                        {blog?.title}
+                        {blog.title}
                     </h1>
-                    {blog?.imageUrl && (
+                    {blog.imageUrl && (
                         <>
                             <img
                                 src={blog.imageUrl}
@@ -391,7 +445,7 @@ const BlogDetail = () => {
                                     <h3 className="text-xl font-['Space_Grotesk'] font-bold text-white mb-4">
                                         Summary
                                     </h3>
-                                    <div className="p-4 bg[rgba(229,228,226,0.1)] border-2 border-[rgba(229,228,226,0.3)] rounded-lg">
+                                    <div className="p-4 bg-[rgba(229,228,226,0.1)] border-2 border-[rgba(229,228,226,0.3)] rounded-lg">
                                         <p className="text-white mb-4">{summary}</p>
                                         <div className="mt-4">
                                             <h4 className="text-lg font-['Space_Grotesk'] font-bold text-white mb-2">
@@ -433,7 +487,7 @@ const BlogDetail = () => {
                             )}
                         </>
                     )}
-                    {!blog?.imageUrl && summary && (
+                    {!blog.imageUrl && summary && (
                         <div className="mb-12">
                             <h3 className="text-xl font-['Space_Grotesk'] font-bold text-white mb-4">
                                 Summary
@@ -481,7 +535,7 @@ const BlogDetail = () => {
                 </header>
 
                 <div className="prose prose-invert max-w-none markdown-content">
-                    {renderedContent?.includes('<') ? (
+                    {renderedContent.includes('<') ? (
                         <div dangerouslySetInnerHTML={{ __html: renderedContent }} />
                     ) : (
                         <div style={{ whiteSpace: 'pre-wrap' }}>
@@ -490,7 +544,7 @@ const BlogDetail = () => {
                     )}
                 </div>
 
-                {blog?.codeSnippet && (
+                {blog.codeSnippet && (
                     <div className="mt-8 mb-12">
                         <h3 className="text-xl font-['Space_Grotesk'] font-bold text-white mb-4">
                             Code Example
@@ -532,7 +586,7 @@ const BlogDetail = () => {
                     </div>
                 )}
 
-                {(blog?.createdAt || blog?.updatedAt) && (
+                {(blog.createdAt || blog.updatedAt) && (
                     <div className="text-[rgba(229,228,226,0.8)] mb-8 text-sm">
                         <p>
                             Published: {blog.createdAt ? new Date(blog.createdAt).toLocaleDateString('en-US', {
@@ -557,7 +611,7 @@ const BlogDetail = () => {
 
                 <div className="mt-16 pt-8 border-t border-[rgba(229,228,226,0.3)]">
                     <div className="flex flex-col md:flex-row items-center md:items-start gap-6">
-                        {author?.photo && (
+                        {author.photo && (
                             <img
                                 src={author.photo}
                                 alt={author.name}
@@ -566,12 +620,12 @@ const BlogDetail = () => {
                         )}
                         <div>
                             <h3 className="text-xl font-['Space_Grotesk'] font-bold mb-2 text-center md:text-left">
-                                {author?.name}
+                                {author.name}
                             </h3>
                             <p className="text-[rgba(229,228,226,0.8)] mb-4 text-center md:text-left">
-                                {author?.about}
+                                {author.about}
                             </p>
-                            {author?.email && (
+                            {author.email && (
                                 <button
                                     onClick={handleSubscribeToggle}
                                     className={`mb-4 px-4 py-2 text-sm font-medium text-black bg-white hover:bg-[#E5E4E2] transition-brutal ${isSubscribing ? 'opacity-50 cursor-not-allowed' : ''}`}
@@ -585,7 +639,7 @@ const BlogDetail = () => {
                                 </button>
                             )}
                             <div className="flex gap-4 justify-center md:justify-start">
-                                {author?.linkedin && (
+                                {author.linkedin && (
                                     <a
                                         href={author.linkedin}
                                         target="_blank"
@@ -596,7 +650,7 @@ const BlogDetail = () => {
                                         <Linkedin size={18} />
                                     </a>
                                 )}
-                                {author?.twitter && (
+                                {author.twitter && (
                                     <a
                                         href={author.twitter}
                                         target="_blank"
@@ -607,7 +661,7 @@ const BlogDetail = () => {
                                         <Twitter size={18} />
                                     </a>
                                 )}
-                                {author?.github && (
+                                {author.github && (
                                     <a
                                         href={author.github}
                                         target="_blank"
@@ -623,54 +677,54 @@ const BlogDetail = () => {
                     </div>
                 </div>
 
-                <CommentSection blogId={blog?.id} />
+                <CommentSection blogId={blog.id} />
             </article>
 
             <style jsx>{`
-        .markdown-content :where(h1, h2, h3, h4, h5, h6) {
-          font-family: "Space Grotesk", sans-serif;
-          font-weight: bold;
-          color: white;
-          margin: 1rem 0;
-        }
-        .markdown-content h1 { font-size: 2.25rem; }
-        .markdown-content h2 { font-size: 1.875rem; }
-        .markdown-content h3 { font-size: 1.5rem; }
-        .markdown-content p {
-          margin: 0.5rem 0;
-          color: rgba(229, 228, 226, 0.8);
-          lineHeight: 1.6;
-        }
-        .markdown-content ul,
-        .markdown-content ol {
-          margin: 0.5rem 0;
-          padding-left: 2rem;
-          color: rgba(229, 228, 226, 0.8);
-        }
-        .markdown-content li {
-          margin: 0.25rem 0;
-        }
-        .markdown-content strong {
-          font-weight: bold;
-          color: white;
-        }
-        .markdown-content em {
-          font-style: italic;
-        }
-        .markdown-content code {
-          background: rgba(229, 228, 226, 0.1);
-          padding: 0.2rem 0.4rem;
-          border-radius: 4px;
-          color: white;
-          font-family: 'Fira Code', 'Consolas', monospace;
-        }
-        .markdown-content pre {
-          background: #1e1e1e;
-          padding: 1rem;
-          border-radius: 0.5rem;
-          overflow-x: auto;
-        }
-      `}</style>
+                .markdown-content :where(h1, h2, h3, h4, h5, h6) {
+                    font-family: "Space Grotesk", sans-serif;
+                    font-weight: bold;
+                    color: white;
+                    margin: 1rem 0;
+                }
+                .markdown-content h1 { font-size: 2.25rem; }
+                .markdown-content h2 { font-size: 1.875rem; }
+                .markdown-content h3 { font-size: 1.5rem; }
+                .markdown-content p {
+                    margin: 0.5rem 0;
+                    color: rgba(229, 228, 226, 0.8);
+                    lineHeight: 1.6;
+                }
+                .markdown-content ul,
+                .markdown-content ol {
+                    margin: 0.5rem 0;
+                    padding-left: 2rem;
+                    color: rgba(229, 228, 226, 0.8);
+                }
+                .markdown-content li {
+                    margin: 0.25rem 0;
+                }
+                .markdown-content strong {
+                    font-weight: bold;
+                    color: white;
+                }
+                .markdown-content em {
+                    font-style: italic;
+                }
+                .markdown-content code {
+                    background: rgba(229, 228, 226, 0.1);
+                    padding: 0.2rem 0.4rem;
+                    border-radius: 4px;
+                    color: white;
+                    font-family: 'Fira Code', 'Consolas', monospace;
+                }
+                .markdown-content pre {
+                    background: #1e1e1e;
+                    padding: 1rem;
+                    border-radius: 0.5rem;
+                    overflow-x: auto;
+                }
+            `}</style>
         </div>
     );
 };
