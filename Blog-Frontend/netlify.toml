@@ -1,5 +1,8 @@
-[functions]
-  directory = "netlify/functions/"
+[build]
+  command = "npm run build"
+  publish = "dist"
 
-[functions."summarize"]
-  timeout = 25 # Set timeout to 25 seconds
+[functions]
+  directory = "netlify/functions"
+  node_bundler = "esbuild"
+  included_files = []
