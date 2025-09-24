@@ -8,6 +8,7 @@ import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import apiFetch from "../utils/api";
 import { marked } from "marked";
 import DOMPurify from "dompurify";
+const HF_API_KEY = import.meta.env.VITE_HF_API_KEY;
 
 const BlogDetail = () => {
     const { id } = useParams();
@@ -39,6 +40,9 @@ const BlogDetail = () => {
                 }
                 const data = await blogResponse.json();
 
+                console.log("DEBUG: Raw API dates - createdAt:", data.createdAt, "updatedAt:", data.updatedAt);
+
+                console.log("Blog API Response:", data);
                 setBlog({
                     id: data.id,
                     title: data.title,
@@ -49,8 +53,12 @@ const BlogDetail = () => {
                     imageUrl: data.image ? `data:image/jpeg;base64,${data.image}` : null,
                     createdAt: data.createdAt,
                     updatedAt: data.updatedAt,
+                    date: data.createdAt ? new Date(data.createdAt).toLocaleDateString('en-US', {
+                        month: 'short',
+                        day: 'numeric',
+                        year: 'numeric'
+                    }).toUpperCase() : "Unknown",
                 });
-
                 setAuthor({
                     email: data.authorEmail,
                     name: data.author.name,
@@ -67,18 +75,19 @@ const BlogDetail = () => {
                     return;
                 }
 
+                console.log("Fetching subscription status for author email:", data.authorEmail);
                 const subscriptionResponse = await apiFetch(`/api/subscribers/author/email/${encodeURIComponent(data.authorEmail)}/status`);
                 if (subscriptionResponse.ok) {
                     const subscriptionData = await subscriptionResponse.json();
                     setIsSubscribed(subscriptionData.isSubscribed);
                 } else {
-                    console.warn("Failed to fetch subscription status");
+                    console.warn("Failed to fetch subscription status, proceeding without it");
                 }
 
+                setLoading(false);
             } catch (error) {
                 console.error("Error fetching blog or subscription status:", error);
                 setLinkError(true);
-            } finally {
                 setLoading(false);
             }
         };
@@ -88,42 +97,112 @@ const BlogDetail = () => {
 
     const handleSummarize = async () => {
         if (!blog?.content) {
-            toast({ title: "No Content", description: "There is no content to summarize.", variant: "destructive" });
+            toast({
+                title: "No Content",
+                description: "There is no content to summarize.",
+                variant: "destructive",
+            });
             return;
         }
 
         setIsSummarizing(true);
         setSummary('');
-        setQaHistory([]);
+        setQaHistory([]); // Clear QA history when a new summary is generated
 
         try {
             let fullContent = blog.content || '';
             if (blog.codeSnippet?.content) {
-                const cleanedCode = blog.codeSnippet.content.replace(/\s+/g, ' ').trim();
+                const cleanedCode = blog.codeSnippet.content
+                    .replace(/\s+/g, ' ')
+                    .trim();
                 fullContent += `\n\nCode Example (${blog.codeSnippet.language}):\n${cleanedCode}`;
             }
-            fullContent = fullContent.replace(/[\x00-\x1F\x7F-\x9F]/g, '').replace(/["'`]/g, '"');
-            const maxWords = Math.floor(800 / 1.3);
-            const truncatedContent = fullContent.split(' ').slice(0, maxWords).join(' ');
-            let contentToSummarize = truncatedContent.trim();
 
+            fullContent = fullContent
+                .replace(/[\x00-\x1F\x7F-\x9F]/g, '')
+                .replace(/["'`]/g, '"');
+
+            const inputWords = fullContent.split(' ');
+            const estimatedTokens = inputWords.length * 1.3;
+            const maxTokens = 800;
+            const maxWords = Math.floor(maxTokens / 1.3);
+            const truncatedContent = inputWords.length > maxWords ? inputWords.slice(0, maxWords).join(' ') : fullContent;
+
+            let contentToSummarize = truncatedContent.trim();
             if (!contentToSummarize) {
                 throw new Error('Content is empty after processing.');
             }
 
-            const response = await fetch('/.netlify/functions/summarize', {
+            console.log('Content to summarize:', contentToSummarize);
+            console.log('Estimated tokens:', contentToSummarize.split(' ').length * 1.3);
+
+            const response = await fetch('https://api-inference.huggingface.co/models/facebook/bart-large-cnn', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ contentToSummarize }),
+                headers: {
+                    'Authorization': `Bearer ${HF_API_KEY}`,
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    inputs: contentToSummarize,
+                    parameters: {
+                        min_length: 50,
+                        max_length: 1000,
+                        do_sample: false,
+                    },
+                }),
             });
 
             if (!response.ok) {
-                const errorText = await response.text();
-                try {
-                    const errorJson = JSON.parse(errorText);
-                    throw new Error(errorJson.error || `Server error: ${response.status}`);
-                } catch (e) {
-                    throw new Error(errorText || `Server error: ${response.status}`);
+                if (response.status === 400) {
+                    const errorData = await response.json();
+                    throw new Error(errorData.error || 'Invalid input for summarization. The content may be too long or contain unsupported characters.');
+                } else if (response.status === 401) {
+                    throw new Error('Authentication failed. Please check your API key.');
+                } else if (response.status === 429) {
+                    throw new Error('Rate limit reached. Please try again later.');
+                } else if (response.status === 503) {
+                    await new Promise(resolve => setTimeout(resolve, 5000));
+                    const retryResponse = await fetch('https://api-inference.huggingface.co/models/facebook/bart-large-cnn', {
+                        method: 'POST',
+                        headers: {
+                            'Authorization': `Bearer ${HF_API_KEY}`,
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({
+                            inputs: contentToSummarize,
+                            parameters: {
+                                min_length: 50,
+                                max_length: 1000,
+                                do_sample: false,
+                            },
+                        }),
+                    });
+                    if (!retryResponse.ok) {
+                        throw new Error('Model loading failed after retry. Please try again later.');
+                    }
+                    const retryResult = await retryResponse.json();
+                    const fullSummary = retryResult[0].summary_text;
+                    if (!fullSummary) {
+                        throw new Error('No summary returned from the API.');
+                    }
+                    const retrySummaryWords = fullSummary.split(' ');
+                    let currentSummary = '';
+                    let index = 0;
+
+                    const streamSummary = () => {
+                        if (index < retrySummaryWords.length) {
+                            currentSummary += (index > 0 ? ' ' : '') + retrySummaryWords[index];
+                            setSummary(currentSummary);
+                            index++;
+                            setTimeout(streamSummary, 50);
+                        } else {
+                            setIsSummarizing(false);
+                        }
+                    };
+                    streamSummary();
+                    return;
+                } else {
+                    throw new Error('Failed to summarize the blog post.');
                 }
             }
 
@@ -151,62 +230,90 @@ const BlogDetail = () => {
 
         } catch (error) {
             console.error('Summarization error:', error);
-            let description = error.message.includes("Gateway Timeout") || error.message.includes("504")
-                ? "The AI model is taking too long to respond. Please try again in a moment."
-                : error.message || "Could not summarize the blog post.";
-
-            toast({ title: "Summarization Failed", description, variant: "destructive" });
+            toast({
+                title: "Summarization Failed",
+                description: error.message || "Could not summarize the blog post.",
+                variant: "destructive",
+            });
             setIsSummarizing(false);
         }
     };
 
     const handleAskQuestion = async () => {
-        if (!question.trim() || !blog?.content) {
-            toast({ title: "Invalid Input", description: "Please enter a question.", variant: "destructive" });
+        if (!question.trim()) {
+            toast({
+                title: "Invalid Input",
+                description: "Please enter a question.",
+                variant: "destructive",
+            });
+            return;
+        }
+
+        if (!blog?.content) {
+            toast({
+                title: "No Content",
+                description: "There is no blog content to answer from.",
+                variant: "destructive",
+            });
             return;
         }
 
         setIsAnswering(true);
 
         try {
-            let contentToAnswer = blog.content.replace(/[\x00-\x1F\x7F-\x9F]/g, '').replace(/["'`]/g, '"').trim();
+            // Clean the blog content
+            let contentToAnswer = blog.content
+                .replace(/[\x00-\x1F\x7F-\x9F]/g, '')
+                .replace(/["'`]/g, '"')
+                .trim();
+
             if (!contentToAnswer) {
                 throw new Error('Blog content is empty after processing.');
             }
 
-            const response = await fetch('/.netlify/functions/ask-question', {
+            const response = await fetch('https://api-inference.huggingface.co/models/deepset/roberta-base-squad2', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: {
+                    'Authorization': `Bearer ${HF_API_KEY}`,
+                    'Content-Type': 'application/json',
+                },
                 body: JSON.stringify({
-                    question: question.trim(),
-                    context: contentToAnswer,
+                    inputs: {
+                        question: question.trim(),
+                        context: contentToAnswer,
+                    },
                 }),
             });
 
             if (!response.ok) {
-                const errorText = await response.text();
-                try {
-                    const errorJson = JSON.parse(errorText);
-                    throw new Error(errorJson.error || `Server error: ${response.status}`);
-                } catch (e) {
-                    throw new Error(errorText || `Server error: ${response.status}`);
+                if (response.status === 400) {
+                    const errorData = await response.json();
+                    throw new Error(errorData.error || 'Invalid input for question answering.');
+                } else if (response.status === 401) {
+                    throw new Error('Authentication failed. Please check your API key.');
+                } else if (response.status === 429) {
+                    throw new Error('Rate limit reached. Please try again later.');
+                } else if (response.status === 503) {
+                    throw new Error('Model is loading. Please try again later.');
+                } else {
+                    throw new Error('Failed to process the question.');
                 }
             }
 
             const result = await response.json();
             if (!result.answer) {
-                throw new Error('No answer could be found in the text for that question.');
+                throw new Error('No answer returned from the API.');
             }
 
             setQaHistory([...qaHistory, { question: question.trim(), answer: result.answer }]);
             setQuestion('');
         } catch (error) {
             console.error('Question answering error:', error);
-            let description = error.message.includes("Gateway Timeout") || error.message.includes("504")
-                ? "The AI model is taking too long to respond. Please try again in a moment."
-                : error.message || "Could not process your question.";
-
-            toast({ title: "Question Answering Failed", description, variant: "destructive" });
+            toast({
+                title: "Question Answering Failed",
+                description: error.message || "Could not process your question.",
+                variant: "destructive",
+            });
         } finally {
             setIsAnswering(false);
         }
@@ -214,7 +321,11 @@ const BlogDetail = () => {
 
     const handleSubscribeToggle = async () => {
         if (!author.email) {
-            toast({ title: "Subscription Unavailable", description: "Author information is missing.", variant: "destructive" });
+            toast({
+                title: "Subscription Unavailable",
+                description: "Cannot subscribe due to missing author information.",
+                variant: "destructive",
+            });
             return;
         }
 
@@ -240,11 +351,15 @@ const BlogDetail = () => {
                 title: isSubscribed ? "Unsubscribed" : "Subscribed!",
                 description: isSubscribed
                     ? `You have unsubscribed from ${author.name}'s updates.`
-                    : `You will now receive updates from ${author.name}.`,
+                    : `You will receive updates from ${author.name}.`,
                 variant: "success",
             });
         } catch (error) {
-            toast({ title: "Subscription Failed", description: error.message, variant: "destructive" });
+            toast({
+                title: "Subscription Failed",
+                description: error.message || "Something went wrong. Try again later.",
+                variant: "destructive",
+            });
         } finally {
             setIsSubscribing(false);
         }
@@ -252,13 +367,29 @@ const BlogDetail = () => {
 
     const handleCopyCode = (code) => {
         navigator.clipboard.writeText(code).then(() => {
-            toast({ title: "Code Copied", description: "The code snippet is on your clipboard.", variant: "success" });
-        }).catch(() => {
-            toast({ title: "Copy Failed", description: "Failed to copy the code snippet.", variant: "destructive" });
+            toast({
+                title: "Code Copied",
+                description: "The code snippet has been copied to your clipboard.",
+                variant: "success",
+            });
+        }).catch((err) => {
+            console.error('Failed to copy code:', err);
+            toast({
+                title: "Copy Failed",
+                description: "Failed to copy the code snippet.",
+                variant: "destructive",
+            });
         });
     };
 
-    const renderedContent = DOMPurify.sanitize(marked(blog?.content || ""));
+    let renderedContent;
+    try {
+        const markdownContent = marked(blog?.content || "No content available");
+        renderedContent = DOMPurify.sanitize(markdownContent);
+    } catch (err) {
+        console.error("Error parsing Markdown:", err);
+        renderedContent = blog?.content || "No content available";
+    }
 
     if (loading) {
         return (
@@ -268,7 +399,7 @@ const BlogDetail = () => {
         );
     }
 
-    if (linkError || !blog || !author) {
+    if (linkError) {
         return (
             <div className="pt-20 min-h-screen bg-black flex items-center justify-center">
                 <p className="text-white">Blog not found or you are not authorized to view it.</p>
@@ -303,13 +434,60 @@ const BlogDetail = () => {
                         {blog.title}
                     </h1>
                     {blog.imageUrl && (
-                        <img
-                            src={blog.imageUrl}
-                            alt={blog.title}
-                            className="w-full aspect-[21/9] object-cover mb-12"
-                        />
+                        <>
+                            <img
+                                src={blog.imageUrl}
+                                alt={blog.title}
+                                className="w-full aspect-[21/9] object-cover mb-12"
+                            />
+                            {summary && (
+                                <div className="mb-12">
+                                    <h3 className="text-xl font-['Space_Grotesk'] font-bold text-white mb-4">
+                                        Summary
+                                    </h3>
+                                    <div className="p-4 bg-[rgba(229,228,226,0.1)] border-2 border-[rgba(229,228,226,0.3)] rounded-lg">
+                                        <p className="text-white mb-4">{summary}</p>
+                                        <div className="mt-4">
+                                            <h4 className="text-lg font-['Space_Grotesk'] font-bold text-white mb-2">
+                                                Have a question about the blog?
+                                            </h4>
+                                            <div className="flex gap-2 mb-4">
+                                                <input
+                                                    type="text"
+                                                    value={question}
+                                                    onChange={(e) => setQuestion(e.target.value)}
+                                                    placeholder="Ask a question about the blog..."
+                                                    className="flex-1 px-3 py-2 bg-[rgba(229,228,226,0.1)] border border-[rgba(229,228,226,0.3)] text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-white"
+                                                />
+                                                <button
+                                                    onClick={handleAskQuestion}
+                                                    className={`px-4 py-2 text-sm font-medium font-['Space_Grotesk'] text-black bg-white hover:bg-[#E5E4E2] transition-brutal ${isAnswering ? 'opacity-50 cursor-not-allowed' : ''}`}
+                                                    disabled={isAnswering}
+                                                >
+                                                    {isAnswering ? 'Answering...' : 'Ask'}
+                                                </button>
+                                            </div>
+                                            {qaHistory.length > 0 && (
+                                                <div className="mt-4">
+                                                    {qaHistory.map((qa, index) => (
+                                                        <div key={index} className="mb-4">
+                                                            <p className="text-[rgba(229,228,226,0.8)]">
+                                                                <span className="font-bold">Q:</span> {qa.question}
+                                                            </p>
+                                                            <p className="text-white">
+                                                                <span className="font-bold">A:</span> {qa.answer}
+                                                            </p>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+                        </>
                     )}
-                    {summary && (
+                    {!blog.imageUrl && summary && (
                         <div className="mb-12">
                             <h3 className="text-xl font-['Space_Grotesk'] font-bold text-white mb-4">
                                 Summary
@@ -356,7 +534,15 @@ const BlogDetail = () => {
                     )}
                 </header>
 
-                <div className="prose prose-invert max-w-none markdown-content" dangerouslySetInnerHTML={{ __html: renderedContent }} />
+                <div className="prose prose-invert max-w-none markdown-content">
+                    {renderedContent.includes('<') ? (
+                        <div dangerouslySetInnerHTML={{ __html: renderedContent }} />
+                    ) : (
+                        <div style={{ whiteSpace: 'pre-wrap' }}>
+                            {renderedContent}
+                        </div>
+                    )}
+                </div>
 
                 {blog.codeSnippet && (
                     <div className="mt-8 mb-12">
@@ -404,16 +590,22 @@ const BlogDetail = () => {
                     <div className="text-[rgba(229,228,226,0.8)] mb-8 text-sm">
                         <p>
                             Published: {blog.createdAt ? new Date(blog.createdAt).toLocaleDateString('en-US', {
-                                month: 'short', day: 'numeric', year: 'numeric'
+                                month: 'short',
+                                day: 'numeric',
+                                year: 'numeric'
                             }) : ''}
                         </p>
-                        {blog.updatedAt && blog.createdAt && new Date(blog.updatedAt).getTime() !== new Date(blog.createdAt).getTime() && (
-                            <p>
-                                Updated: {new Date(blog.updatedAt).toLocaleDateString('en-US', {
-                                    month: 'short', day: 'numeric', year: 'numeric'
-                                })}
-                            </p>
-                        )}
+                        {blog.updatedAt &&
+                            blog.createdAt &&
+                            new Date(blog.updatedAt).getTime() !== new Date(blog.createdAt).getTime() && (
+                                <p>
+                                    Updated: {new Date(blog.updatedAt).toLocaleDateString('en-US', {
+                                        month: 'short',
+                                        day: 'numeric',
+                                        year: 'numeric'
+                                    })}
+                                </p>
+                            )}
                     </div>
                 )}
 
@@ -448,17 +640,35 @@ const BlogDetail = () => {
                             )}
                             <div className="flex gap-4 justify-center md:justify-start">
                                 {author.linkedin && (
-                                    <a href={author.linkedin} target="_blank" rel="noopener noreferrer" className="p-2 border border-[rgba(229,228,226,0.5)] text-[rgba(229,228,226,0.8)] hover:text-white hover:border-white transition-brutal" title="LinkedIn Profile">
+                                    <a
+                                        href={author.linkedin}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="p-2 border border-[rgba(229,228,226,0.5)] text-[rgba(229,228,226,0.8)] hover:text-white hover:border-white transition-brutal"
+                                        title="LinkedIn Profile"
+                                    >
                                         <Linkedin size={18} />
                                     </a>
                                 )}
                                 {author.twitter && (
-                                    <a href={author.twitter} target="_blank" rel="noopener noreferrer" className="p-2 border border-[rgba(229,228,226,0.5)] text-[rgba(229,228,226,0.8)] hover:text-white hover:border-white transition-brutal" title="X (Twitter) Profile">
+                                    <a
+                                        href={author.twitter}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="p-2 border border-[rgba(229,228,226,0.5)] text-[rgba(229,228,226,0.8)] hover:text-white hover:border-white transition-brutal"
+                                        title="X (Twitter) Profile"
+                                    >
                                         <Twitter size={18} />
                                     </a>
                                 )}
                                 {author.github && (
-                                    <a href={author.github} target="_blank" rel="noopener noreferrer" className="p-2 border border-[rgba(229,228,226,0.5)] text-[rgba(229,228,226,0.8)] hover:text-white hover:border-white transition-brutal" title="GitHub Profile">
+                                    <a
+                                        href={author.github}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="p-2 border border-[rgba(229,228,226,0.5)] text-[rgba(229,228,226,0.8)] hover:text-white hover:border-white transition-brutal"
+                                        title="GitHub Profile"
+                                    >
                                         <Github size={18} />
                                     </a>
                                 )}
