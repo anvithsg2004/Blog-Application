@@ -10,7 +10,6 @@ export const handler = async (event) => {
             return { statusCode: 400, body: JSON.stringify({ error: 'Question and context are required.' }) };
         }
 
-        // Securely access the API key
         const HF_API_KEY = process.env.VITE_HF_API_KEY;
         if (!HF_API_KEY) {
             throw new Error("Hugging Face API key is not configured.");

@@ -1,2 +1,5 @@
 [functions]
   directory = "netlify/functions/"
+
+[functions."summarize"]
+  timeout = 25 # Set timeout to 25 seconds
