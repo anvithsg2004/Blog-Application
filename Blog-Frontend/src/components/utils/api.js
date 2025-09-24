@@ -1,8 +1,8 @@
 import authService from '../../services/authService';
 
-// const API_BASE_URL = "http://localhost:8080";
+const API_BASE_URL = "http://localhost:8080";
 
-const API_BASE_URL = "https://blogs-backend-w9x0.onrender.com";
+// const API_BASE_URL = "https://blogs-backend-w9x0.onrender.com";
 
 /**
  * Enhanced API fetch function that works with both OAuth and Basic Auth

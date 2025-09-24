@@ -107,103 +107,36 @@ const BlogDetail = () => {
 
         setIsSummarizing(true);
         setSummary('');
-        setQaHistory([]); // Clear QA history when a new summary is generated
+        setQaHistory([]);
 
         try {
+            // --- Content preparation logic (no changes here) ---
             let fullContent = blog.content || '';
             if (blog.codeSnippet?.content) {
-                const cleanedCode = blog.codeSnippet.content
-                    .replace(/\s+/g, ' ')
-                    .trim();
+                const cleanedCode = blog.codeSnippet.content.replace(/\s+/g, ' ').trim();
                 fullContent += `\n\nCode Example (${blog.codeSnippet.language}):\n${cleanedCode}`;
             }
-
-            fullContent = fullContent
-                .replace(/[\x00-\x1F\x7F-\x9F]/g, '')
-                .replace(/["'`]/g, '"');
-
+            fullContent = fullContent.replace(/[\x00-\x1F\x7F-\x9F]/g, '').replace(/["'`]/g, '"');
             const inputWords = fullContent.split(' ');
-            const estimatedTokens = inputWords.length * 1.3;
             const maxTokens = 800;
             const maxWords = Math.floor(maxTokens / 1.3);
             const truncatedContent = inputWords.length > maxWords ? inputWords.slice(0, maxWords).join(' ') : fullContent;
-
             let contentToSummarize = truncatedContent.trim();
             if (!contentToSummarize) {
                 throw new Error('Content is empty after processing.');
             }
+            // --- End of content preparation ---
 
-            console.log('Content to summarize:', contentToSummarize);
-            console.log('Estimated tokens:', contentToSummarize.split(' ').length * 1.3);
-
-            const response = await fetch('https://api-inference.huggingface.co/models/facebook/bart-large-cnn', {
+            // Call your own backend endpoint
+            const response = await fetch('/.netlify/functions/summarize', {
                 method: 'POST',
-                headers: {
-                    'Authorization': `Bearer ${HF_API_KEY}`,
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    inputs: contentToSummarize,
-                    parameters: {
-                        min_length: 50,
-                        max_length: 1000,
-                        do_sample: false,
-                    },
-                }),
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ contentToSummarize }),
             });
 
             if (!response.ok) {
-                if (response.status === 400) {
-                    const errorData = await response.json();
-                    throw new Error(errorData.error || 'Invalid input for summarization. The content may be too long or contain unsupported characters.');
-                } else if (response.status === 401) {
-                    throw new Error('Authentication failed. Please check your API key.');
-                } else if (response.status === 429) {
-                    throw new Error('Rate limit reached. Please try again later.');
-                } else if (response.status === 503) {
-                    await new Promise(resolve => setTimeout(resolve, 5000));
-                    const retryResponse = await fetch('https://api-inference.huggingface.co/models/facebook/bart-large-cnn', {
-                        method: 'POST',
-                        headers: {
-                            'Authorization': `Bearer ${HF_API_KEY}`,
-                            'Content-Type': 'application/json',
-                        },
-                        body: JSON.stringify({
-                            inputs: contentToSummarize,
-                            parameters: {
-                                min_length: 50,
-                                max_length: 1000,
-                                do_sample: false,
-                            },
-                        }),
-                    });
-                    if (!retryResponse.ok) {
-                        throw new Error('Model loading failed after retry. Please try again later.');
-                    }
-                    const retryResult = await retryResponse.json();
-                    const fullSummary = retryResult[0].summary_text;
-                    if (!fullSummary) {
-                        throw new Error('No summary returned from the API.');
-                    }
-                    const retrySummaryWords = fullSummary.split(' ');
-                    let currentSummary = '';
-                    let index = 0;
-
-                    const streamSummary = () => {
-                        if (index < retrySummaryWords.length) {
-                            currentSummary += (index > 0 ? ' ' : '') + retrySummaryWords[index];
-                            setSummary(currentSummary);
-                            index++;
-                            setTimeout(streamSummary, 50);
-                        } else {
-                            setIsSummarizing(false);
-                        }
-                    };
-                    streamSummary();
-                    return;
-                } else {
-                    throw new Error('Failed to summarize the blog post.');
-                }
+                const errorData = await response.json();
+                throw new Error(errorData.error || 'Failed to summarize the blog post.');
             }
 
             const result = await response.json();
@@ -211,6 +144,7 @@ const BlogDetail = () => {
                 throw new Error('No summary returned from the API.');
             }
 
+            // --- Streaming logic (no changes here) ---
             const fullSummary = result[0].summary_text;
             const summaryWords = fullSummary.split(' ');
             let currentSummary = '';
@@ -240,19 +174,10 @@ const BlogDetail = () => {
     };
 
     const handleAskQuestion = async () => {
-        if (!question.trim()) {
+        if (!question.trim() || !blog?.content) {
             toast({
                 title: "Invalid Input",
                 description: "Please enter a question.",
-                variant: "destructive",
-            });
-            return;
-        }
-
-        if (!blog?.content) {
-            toast({
-                title: "No Content",
-                description: "There is no blog content to answer from.",
                 variant: "destructive",
             });
             return;
@@ -262,42 +187,24 @@ const BlogDetail = () => {
 
         try {
             // Clean the blog content
-            let contentToAnswer = blog.content
-                .replace(/[\x00-\x1F\x7F-\x9F]/g, '')
-                .replace(/["'`]/g, '"')
-                .trim();
-
+            let contentToAnswer = blog.content.replace(/[\x00-\x1F\x7F-\x9F]/g, '').replace(/["'`]/g, '"').trim();
             if (!contentToAnswer) {
                 throw new Error('Blog content is empty after processing.');
             }
 
-            const response = await fetch('https://api-inference.huggingface.co/models/deepset/roberta-base-squad2', {
+            // Call your own backend endpoint for asking questions
+            const response = await fetch('/.netlify/functions/ask-question', {
                 method: 'POST',
-                headers: {
-                    'Authorization': `Bearer ${HF_API_KEY}`,
-                    'Content-Type': 'application/json',
-                },
+                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    inputs: {
-                        question: question.trim(),
-                        context: contentToAnswer,
-                    },
+                    question: question.trim(),
+                    context: contentToAnswer,
                 }),
             });
 
             if (!response.ok) {
-                if (response.status === 400) {
-                    const errorData = await response.json();
-                    throw new Error(errorData.error || 'Invalid input for question answering.');
-                } else if (response.status === 401) {
-                    throw new Error('Authentication failed. Please check your API key.');
-                } else if (response.status === 429) {
-                    throw new Error('Rate limit reached. Please try again later.');
-                } else if (response.status === 503) {
-                    throw new Error('Model is loading. Please try again later.');
-                } else {
-                    throw new Error('Failed to process the question.');
-                }
+                const errorData = await response.json();
+                throw new Error(errorData.error || 'Failed to process the question.');
             }
 
             const result = await response.json();
