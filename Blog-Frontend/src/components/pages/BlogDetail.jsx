@@ -9,7 +9,6 @@ import apiFetch from "../utils/api";
 import { marked } from "marked";
 import DOMPurify from "dompurify";
 
-// NOTE: Removed HF_API_KEY usage from client to avoid exposing secrets.
 
 const BlogDetail = () => {
     const { id } = useParams();
@@ -137,7 +136,7 @@ const BlogDetail = () => {
             console.log('Estimated tokens:', contentToSummarize.split(' ').length * 1.3);
 
             // Call Netlify Function proxy (server handles CORS and HF token)
-            const response = await fetch('/.netlify/functions/summarize', {
+            const response = await fetch('/.netlify/functions/gemini-summarize', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -225,7 +224,7 @@ const BlogDetail = () => {
             }
 
             // Call Netlify Function proxy (server handles CORS and HF token)
-            const response = await fetch('/.netlify/functions/qa', {
+            const response = await fetch('/.netlify/functions/gemini-qa', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
