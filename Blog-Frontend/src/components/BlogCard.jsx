@@ -5,7 +5,9 @@ import { Tag } from "./shared/Tag";
 import { MarkdownView } from "./shared/MarkdownView";
 import { cn } from "@/lib/utils";
 
-const FALLBACK_IMG = "https://images.pexels.com/photos/3861969/pexels-photo-3861969.jpeg";
+const FALLBACK_IMG =
+  import.meta.env.VITE_FALLBACK_IMAGE ||
+  "https://images.pexels.com/photos/3861969/pexels-photo-3861969.jpeg";
 
 const wordsToReadTime = (str = "") => {
   const words = (str || "").trim().split(/\s+/).filter(Boolean).length;

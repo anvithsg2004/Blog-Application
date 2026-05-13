@@ -11,12 +11,15 @@
 //   [{ "summary_text": "..." }]
 // so BlogDetail.jsx doesn't need to change.
 
-const ALLOWED_ORIGINS = [
-  'https://aidenblog.netlify.app',
-  'http://localhost:5173',
-  'http://localhost:5174',
-  'http://localhost:8888',
-];
+// Comma-separated list of allowed origins (set in .env / Netlify env vars).
+// Falls back to a safe localhost-only list if the env var isn't set.
+const ALLOWED_ORIGINS = (
+  process.env.ALLOWED_ORIGINS ||
+  'http://localhost:5173,http://localhost:5174,http://localhost:8888'
+)
+  .split(',')
+  .map((s) => s.trim())
+  .filter(Boolean);
 
 const corsHeaders = (origin) => {
   const allow = ALLOWED_ORIGINS.includes(origin) ? origin : ALLOWED_ORIGINS[0];

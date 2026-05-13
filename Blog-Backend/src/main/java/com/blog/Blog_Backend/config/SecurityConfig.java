@@ -1,6 +1,7 @@
 package com.blog.Blog_Backend.config;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
@@ -29,6 +30,15 @@ public class SecurityConfig {
     private final UnifiedOAuth2UserService unifiedOAuth2UserService;
 
     private final CustomAuthenticationEntryPoint customAuthenticationEntryPoint;
+
+    @Value("${app.cors.allowed-origins}")
+    private List<String> allowedOrigins;
+
+    @Value("${app.oauth.success-url}")
+    private String oauthSuccessUrl;
+
+    @Value("${app.oauth.failure-url}")
+    private String oauthFailureUrl;
 
     public SecurityConfig(UnifiedOAuth2UserService unifiedOAuth2UserService, CustomAuthenticationEntryPoint customAuthenticationEntryPoint) {
         this.unifiedOAuth2UserService = unifiedOAuth2UserService;
@@ -72,8 +82,8 @@ public class SecurityConfig {
                                 .userService(unifiedOAuth2UserService::loadUser)
                                 .oidcUserService(unifiedOAuth2UserService::loadUser)
                         )
-                        .defaultSuccessUrl("https://aidenblog.netlify.app/login?success=oauth", true)
-                        .failureUrl("https://aidenblog.netlify.app/login?error=oauth_failed")
+                        .defaultSuccessUrl(oauthSuccessUrl, true)
+                        .failureUrl(oauthFailureUrl)
                 );
         return http.build();
     }
@@ -81,11 +91,7 @@ public class SecurityConfig {
     @Bean
     CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration config = new CorsConfiguration();
-        config.setAllowedOrigins(List.of("http://localhost:5173",
-                "https://aidenblog.netlify.app",
-                "https://blogs-backend-fj3b.onrender.com",
-                "https://blogs-backend-w9x0.onrender.com",
-                "https://newblogbackend.onrender.com"));
+        config.setAllowedOrigins(allowedOrigins);
         config.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"));
         config.setAllowedHeaders(Arrays.asList("*"));
         config.setAllowCredentials(true);

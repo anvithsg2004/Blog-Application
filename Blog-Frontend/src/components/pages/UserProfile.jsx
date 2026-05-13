@@ -26,6 +26,10 @@ import { Tag } from "@/components/shared/Tag";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { cn } from "@/lib/utils";
 
+const FALLBACK_IMG =
+  import.meta.env.VITE_FALLBACK_IMAGE ||
+  "https://images.pexels.com/photos/3861969/pexels-photo-3861969.jpeg";
+
 const UserProfile = () => {
   const { user, isLoggedIn, authMethod, refreshUser } = useContext(AuthContext);
   const [userData, setUserData] = useState(null);
@@ -86,7 +90,7 @@ const UserProfile = () => {
               (blog.content || "").split("\n")[0].substring(0, 140) + "…",
             imageUrl: blog.image
               ? `data:image/jpeg;base64,${blog.image}`
-              : "https://images.pexels.com/photos/3861969/pexels-photo-3861969.jpeg",
+              : FALLBACK_IMG,
             authorName: userInfo.name,
             date: new Date(blog.createdAt)
               .toLocaleDateString("en-US", {

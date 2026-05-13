@@ -5,6 +5,11 @@ import { useToast } from "@/hooks/use-toast";
 import apiFetch from "../components/utils/api";
 import { Container } from "./shared/Container";
 
+const TWITTER_URL = import.meta.env.VITE_TWITTER_URL || "#";
+const LINKEDIN_URL = import.meta.env.VITE_LINKEDIN_URL || "#";
+const GITHUB_URL = import.meta.env.VITE_GITHUB_URL || "#";
+const ABOUT_AUTHOR_URL = import.meta.env.VITE_ABOUT_AUTHOR_URL || "#";
+
 const Footer = () => {
   const currentYear = new Date().getFullYear();
   const { toast } = useToast();
@@ -74,22 +79,13 @@ const Footer = () => {
               elegance. Built for developers, writers, and the curious.
             </p>
             <div className="flex gap-3">
-              <SocialLink
-                href="https://x.com/annn_2004"
-                label="Twitter"
-              >
+              <SocialLink href={TWITTER_URL} label="Twitter">
                 <Twitter size={16} />
               </SocialLink>
-              <SocialLink
-                href="https://www.linkedin.com/in/anvith-s-g-3618b1344/"
-                label="LinkedIn"
-              >
+              <SocialLink href={LINKEDIN_URL} label="LinkedIn">
                 <Linkedin size={16} />
               </SocialLink>
-              <SocialLink
-                href="https://github.com/anvithsg2004"
-                label="GitHub"
-              >
+              <SocialLink href={GITHUB_URL} label="GitHub">
                 <Github size={16} />
               </SocialLink>
             </div>
@@ -113,7 +109,7 @@ const Footer = () => {
               <FooterLink to="/register">Register</FooterLink>
               <li>
                 <a
-                  href="https://anvithsg.netlify.app/"
+                  href={ABOUT_AUTHOR_URL}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="text-sm text-ink-muted no-underline transition-colors hover:text-ink"

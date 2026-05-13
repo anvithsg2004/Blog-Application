@@ -9,6 +9,7 @@ import com.blog.Blog_Backend.repository.SubscriberRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.mail.javamail.JavaMailSenderImpl;
 import org.springframework.mail.javamail.MimeMessageHelper;
@@ -42,6 +43,9 @@ public class EmailService {
 
     @Autowired
     private NotificationRepository notificationRepository;
+
+    @Value("${app.frontend.base-url}")
+    private String frontendBaseUrl;
 
     @Autowired
     public EmailService(JavaMailSender mailSender) {
@@ -169,11 +173,24 @@ public class EmailService {
         }
     }
 
-    private String createNewBlogEmailContent(String blogTitle, String blogId, String email, String authorEmail, boolean isAuthorSpecific) {
+    private String trimmedBaseUrl() {
+        return frontendBaseUrl.endsWith("/")
+                ? frontendBaseUrl.substring(0, frontendBaseUrl.length() - 1)
+                : frontendBaseUrl;
+    }
+
+    private String buildUnsubscribeUrl(String email, String authorEmail, boolean isAuthorSpecific) {
         String encodedEmail = URLEncoder.encode(email, StandardCharsets.UTF_8);
-        String unsubscribeUrl = isAuthorSpecific
-                ? "http://localhost:5173/unsubscribe/author?email=" + encodedEmail + "&authorEmail=" + URLEncoder.encode(authorEmail, StandardCharsets.UTF_8)
-                : "http://localhost:5173/unsubscribe/general?email=" + encodedEmail;
+        String base = trimmedBaseUrl();
+        return isAuthorSpecific
+                ? base + "/unsubscribe/author?email=" + encodedEmail
+                        + "&authorEmail=" + URLEncoder.encode(authorEmail, StandardCharsets.UTF_8)
+                : base + "/unsubscribe/general?email=" + encodedEmail;
+    }
+
+    private String createNewBlogEmailContent(String blogTitle, String blogId, String email, String authorEmail, boolean isAuthorSpecific) {
+        String unsubscribeUrl = buildUnsubscribeUrl(email, authorEmail, isAuthorSpecific);
+        String blogUrl = trimmedBaseUrl() + "/blog/" + blogId;
         String message = isAuthorSpecific
                 ? "A new blog titled <strong>" + blogTitle + "</strong> has been posted by your subscribed author."
                 : "A new blog titled <strong>" + blogTitle + "</strong> has been posted on AIDEN.";
@@ -185,7 +202,7 @@ public class EmailService {
                 "<body style='font-family: Arial, sans-serif; color: #333;'>" +
                 "<h2>New Blog Posted on AIDEN!</h2>" +
                 "<p>" + message + "</p>" +
-                "<p>Read it now: <a href='http://localhost:5173/blog/" + blogId + "' style='color: #4B6CB7; text-decoration: none;'>View Blog</a></p>" +
+                "<p>Read it now: <a href='" + blogUrl + "' style='color: #4B6CB7; text-decoration: none;'>View Blog</a></p>" +
                 "<p>Stay tuned for more updates!</p>" +
                 "<p><small><a href='" + unsubscribeUrl + "' style='color: #999;'>" + unsubscribeText + "</a></small></p>" +
                 "</body>" +
@@ -193,10 +210,8 @@ public class EmailService {
     }
 
     private String createUpdatedBlogEmailContent(String blogTitle, String blogId, String email, String authorEmail, boolean isAuthorSpecific) {
-        String encodedEmail = URLEncoder.encode(email, StandardCharsets.UTF_8);
-        String unsubscribeUrl = isAuthorSpecific
-                ? "http://localhost:5173/unsubscribe/author?email=" + encodedEmail + "&authorEmail=" + URLEncoder.encode(authorEmail, StandardCharsets.UTF_8)
-                : "http://localhost:5173/unsubscribe/general?email=" + encodedEmail;
+        String unsubscribeUrl = buildUnsubscribeUrl(email, authorEmail, isAuthorSpecific);
+        String blogUrl = trimmedBaseUrl() + "/blog/" + blogId;
         String message = isAuthorSpecific
                 ? "The blog titled <strong>" + blogTitle + "</strong> has been updated by your subscribed author."
                 : "The blog titled <strong>" + blogTitle + "</strong> has been updated on AIDEN.";
@@ -208,7 +223,7 @@ public class EmailService {
                 "<body style='font-family: Arial, sans-serif; color: #333;'>" +
                 "<h2>Blog Updated on AIDEN!</h2>" +
                 "<p>" + message + "</p>" +
-                "<p>Check out the updates: <a href='http://localhost:5173/blog/" + blogId + "' style='color: #4B6CB7; text-decoration: none;'>View Blog</a></p>" +
+                "<p>Check out the updates: <a href='" + blogUrl + "' style='color: #4B6CB7; text-decoration: none;'>View Blog</a></p>" +
                 "<p>Stay tuned for more updates!</p>" +
                 "<p><small><a href='" + unsubscribeUrl + "' style='color: #999;'>" + unsubscribeText + "</a></small></p>" +
                 "</body>" +

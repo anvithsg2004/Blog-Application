@@ -5,7 +5,9 @@ import { Button } from "@/components/ui/button";
 import { Tag } from "./shared/Tag";
 import { MarkdownView } from "./shared/MarkdownView";
 
-const FALLBACK_IMG = "https://images.pexels.com/photos/3861969/pexels-photo-3861969.jpeg";
+const FALLBACK_IMG =
+  import.meta.env.VITE_FALLBACK_IMAGE ||
+  "https://images.pexels.com/photos/3861969/pexels-photo-3861969.jpeg";
 
 const FeaturedBlog = ({ id, title, excerpt, imageUrl, authorName, date }) => {
   return (

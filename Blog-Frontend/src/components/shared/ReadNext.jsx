@@ -4,6 +4,10 @@ import { Link } from "react-router-dom";
 import BlogCard from "../BlogCard";
 import { useBlogs } from "@/hooks/useBlogs";
 
+const FALLBACK_IMG =
+  import.meta.env.VITE_FALLBACK_IMAGE ||
+  "https://images.pexels.com/photos/3861969/pexels-photo-3861969.jpeg";
+
 const formatBlog = (blog) => ({
   id: blog.id,
   title: blog.title,
@@ -13,7 +17,7 @@ const formatBlog = (blog) => ({
       : blog.content || "",
   imageUrl: blog.image
     ? `data:image/jpeg;base64,${blog.image}`
-    : "https://images.pexels.com/photos/3861969/pexels-photo-3861969.jpeg",
+    : FALLBACK_IMG,
   authorName:
     blog.author?.name ||
     (blog.authorEmail ? blog.authorEmail.split("@")[0] : "Unknown"),

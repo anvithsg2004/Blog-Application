@@ -4,14 +4,17 @@
  */
 
 // Resolves to:
-//   - VITE_API_BASE_URL (if you set it in .env / Netlify env vars)
-//   - http://localhost:8080  for `npm run dev`
-//   - https://blogs-backend-w9x0.onrender.com  for production builds
+//   - VITE_API_BASE_URL (explicit override, any env)
+//   - VITE_API_BASE_URL_PROD  for production builds
+//   - VITE_API_BASE_URL_DEV   for `npm run dev`
+// All three live in .env (or Netlify env vars). Falls back to localhost so
+// the app still boots if .env is missing locally.
 const API_BASE_URL =
     import.meta.env.VITE_API_BASE_URL ||
     (import.meta.env.PROD
-        ? "https://blogs-backend-w9x0.onrender.com"
-        : "http://localhost:8080");
+        ? import.meta.env.VITE_API_BASE_URL_PROD
+        : import.meta.env.VITE_API_BASE_URL_DEV) ||
+    "http://localhost:8080";
 
 class AuthService {
     constructor() {
