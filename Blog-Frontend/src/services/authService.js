@@ -3,18 +3,9 @@
  * Handles both OAuth and Basic Auth with OTP verification
  */
 
-// Resolves to:
-//   - VITE_API_BASE_URL (explicit override, any env)
-//   - VITE_API_BASE_URL_PROD  for production builds
-//   - VITE_API_BASE_URL_DEV   for `npm run dev`
-// All three live in .env (or Netlify env vars). Falls back to localhost so
-// the app still boots if .env is missing locally.
-const API_BASE_URL =
-    import.meta.env.VITE_API_BASE_URL ||
-    (import.meta.env.PROD
-        ? import.meta.env.VITE_API_BASE_URL_PROD
-        : import.meta.env.VITE_API_BASE_URL_DEV) ||
-    "http://localhost:8080";
+// The frontend always talks to the deployed Render backend.
+// Set VITE_API_BASE_URL_PROD in .env (local) or Netlify env vars.
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL_PROD;
 
 class AuthService {
     constructor() {
