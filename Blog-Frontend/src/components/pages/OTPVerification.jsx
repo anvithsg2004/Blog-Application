@@ -3,260 +3,260 @@ import { useNavigate, useLocation } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { AuthContext } from "../AuthContext";
-import { Loader2, ArrowLeft, RefreshCw } from "lucide-react";
+import {
+  Loader2,
+  ArrowLeft,
+  RefreshCw,
+  Mail,
+  ShieldCheck,
+} from "lucide-react";
+import { Container } from "@/components/shared/Container";
+import { cn } from "@/lib/utils";
+
+const OTP_LENGTH = 4;
 
 const OTPVerification = () => {
-    const [otp, setOtp] = useState(Array(4).fill(""));
-    const [timer, setTimer] = useState(30);
-    const [isSubmitting, setIsSubmitting] = useState(false);
-    const [isResending, setIsResending] = useState(false);
-    const inputRefs = useRef([]);
-    const navigate = useNavigate();
-    const { toast } = useToast();
-    const location = useLocation();
-    const email = location.state?.email || "";
+  const [otp, setOtp] = useState(Array(OTP_LENGTH).fill(""));
+  const [timer, setTimer] = useState(30);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isResending, setIsResending] = useState(false);
+  const inputRefs = useRef([]);
+  const navigate = useNavigate();
+  const { toast } = useToast();
+  const location = useLocation();
+  const email = location.state?.email || "";
+  const { verifyOTP, resendOTP, isLoggedIn, authMethod } = useContext(AuthContext);
 
-    const { verifyOTP, resendOTP, isLoggedIn, authMethod } = useContext(AuthContext);
-
-    // Redirect if already logged in or if OAuth user
-    useEffect(() => {
-        if (isLoggedIn) {
-            if (authMethod === 'oauth') {
-                // OAuth users don't need OTP verification
-                navigate('/profile', { replace: true });
-                return;
-            }
-            // Basic auth users who are already verified
-            navigate('/profile', { replace: true });
-            return;
-        }
-
-        if (!email) {
-            navigate("/register", { replace: true });
-            return;
-        }
-    }, [isLoggedIn, authMethod, email, navigate]);
-
-    // Ensure we only ever have 4 refs
-    useEffect(() => {
-        inputRefs.current = inputRefs.current.slice(0, 4);
-    }, []);
-
-    // Countdown timer
-    useEffect(() => {
-        if (timer > 0) {
-            const interval = setInterval(() => {
-                setTimer((t) => t - 1);
-            }, 1000);
-            return () => clearInterval(interval);
-        }
-    }, [timer]);
-
-    const handleOtpChange = (index, value) => {
-        if (value.length > 1) value = value[0];
-        if (value && !/^\d+$/.test(value)) return;
-
-        const newOtp = [...otp];
-        newOtp[index] = value;
-        setOtp(newOtp);
-
-        if (value && index < 3) {
-            inputRefs.current[index + 1]?.focus();
-        }
-    };
-
-    const handleKeyDown = (index, e) => {
-        if (e.key === "Backspace" && !otp[index] && index > 0) {
-            inputRefs.current[index - 1]?.focus();
-        } else if (e.key === "ArrowLeft" && index > 0) {
-            inputRefs.current[index - 1]?.focus();
-        } else if (e.key === "ArrowRight" && index < 3) {
-            inputRefs.current[index + 1]?.focus();
-        }
-    };
-
-    const handleSubmit = async (e) => {
-        e.preventDefault();
-        const code = otp.join("");
-
-        if (code.length !== 4) {
-            toast({
-                title: "Invalid OTP",
-                description: "Please enter a valid 4-digit OTP code.",
-                variant: "destructive",
-            });
-            return;
-        }
-
-        setIsSubmitting(true);
-
-        try {
-            await verifyOTP(email, code);
-
-            toast({
-                title: "Verification Successful",
-                description: "Your account has been verified. You can now sign in.",
-                variant: "success",
-            });
-
-            navigate("/login", { replace: true });
-        } catch (error) {
-            console.error("OTP verification error:", error);
-
-            let errorMessage = "Please try again or request a new code.";
-            if (error.message.includes("expired")) {
-                errorMessage = "OTP has expired. Please request a new code.";
-            } else if (error.message.includes("invalid")) {
-                errorMessage = "Invalid OTP code. Please check and try again.";
-            }
-
-            toast({
-                title: "Verification Failed",
-                description: errorMessage,
-                variant: "destructive",
-            });
-        } finally {
-            setIsSubmitting(false);
-        }
-    };
-
-    const handleResendOtp = async () => {
-        if (timer > 0) return;
-
-        setIsResending(true);
-
-        try {
-            await resendOTP(email);
-            setTimer(30);
-            setOtp(Array(4).fill(""));
-
-            toast({
-                title: "OTP Sent",
-                description: "A new verification code has been sent to your email.",
-                variant: "success",
-            });
-        } catch (error) {
-            console.error("Resend OTP error:", error);
-            toast({
-                title: "Resend Failed",
-                description: error.message || "Failed to resend OTP. Please try again.",
-                variant: "destructive",
-            });
-        } finally {
-            setIsResending(false);
-        }
-    };
-
-    const handleGoBack = () => {
-        navigate('/register', { replace: true });
-    };
-
-    if (!email) {
-        return null; // Will redirect in useEffect
+  useEffect(() => {
+    if (isLoggedIn) {
+      navigate("/profile", { replace: true });
+      return;
     }
+    if (!email) {
+      navigate("/register", { replace: true });
+    }
+  }, [isLoggedIn, authMethod, email, navigate]);
 
-    return (
-        <div className="pt-20 min-h-screen flex items-center justify-center bg-black px-6">
-            <div className="w-full max-w-md border-4 border-white p-8 md:p-12 brutal-shadow">
-                {/* Header with back button */}
-                <div className="flex items-center mb-6">
-                    <button
-                        onClick={handleGoBack}
-                        className="p-2 mr-3 bg-transparent border border-[rgba(229,228,226,0.5)] text-white hover:bg-[rgba(229,228,226,0.1)] transition-brutal flex items-center justify-center"
-                        disabled={isSubmitting || isResending}
-                    >
-                        <ArrowLeft size={20} />
-                    </button>
-                    <h1 className="text-2xl md:text-3xl font-['Space_Grotesk'] font-bold tracking-[-1px] text-white">
-                        VERIFY EMAIL
-                    </h1>
-                </div>
+  useEffect(() => {
+    if (timer > 0) {
+      const interval = setInterval(() => setTimer((t) => t - 1), 1000);
+      return () => clearInterval(interval);
+    }
+  }, [timer]);
 
-                <div className="mb-8 text-center">
-                    <p className="text-[rgba(229,228,226,0.8)] mb-2">
-                        Enter the 4-digit code sent to:
-                    </p>
-                    <p className="text-white font-semibold break-all">
-                        {email}
-                    </p>
-                </div>
+  const handleOtpChange = (index, value) => {
+    if (value.length > 1) value = value[0];
+    if (value && !/^\d+$/.test(value)) return;
+    const newOtp = [...otp];
+    newOtp[index] = value;
+    setOtp(newOtp);
+    if (value && index < OTP_LENGTH - 1) {
+      inputRefs.current[index + 1]?.focus();
+    }
+  };
 
-                <form onSubmit={handleSubmit} className="grid gap-8">
-                    {/* OTP Input Grid */}
-                    <div className="grid grid-cols-4 gap-3">
-                        {otp.map((digit, idx) => (
-                            <input
-                                key={idx}
-                                ref={(el) => (inputRefs.current[idx] = el)}
-                                type="text"
-                                inputMode="numeric"
-                                maxLength={1}
-                                value={digit}
-                                onChange={(e) => handleOtpChange(idx, e.target.value)}
-                                onKeyDown={(e) => handleKeyDown(idx, e)}
-                                className="w-full aspect-square text-center text-2xl font-bold bg-black border-2 border-[rgba(229,228,226,0.5)] text-white outline-none transition-brutal focus:border-white disabled:opacity-50"
-                                aria-label={`Digit ${idx + 1}`}
-                                disabled={isSubmitting || isResending}
-                            />
-                        ))}
-                    </div>
+  const handleKeyDown = (index, e) => {
+    if (e.key === "Backspace" && !otp[index] && index > 0) {
+      inputRefs.current[index - 1]?.focus();
+    } else if (e.key === "ArrowLeft" && index > 0) {
+      inputRefs.current[index - 1]?.focus();
+    } else if (e.key === "ArrowRight" && index < OTP_LENGTH - 1) {
+      inputRefs.current[index + 1]?.focus();
+    }
+  };
 
-                    {/* Timer and Resend */}
-                    <div className="text-center">
-                        {timer > 0 ? (
-                            <p className="text-[rgba(229,228,226,0.8)]">
-                                Resend code in{" "}
-                                <span className="text-white font-semibold">{timer}s</span>
-                            </p>
-                        ) : (
-                            <button
-                                type="button"
-                                onClick={handleResendOtp}
-                                disabled={isSubmitting || isResending}
-                                className="flex items-center gap-2 text-white underline transition-brutal hover:text-[#E5E4E2] focus:outline-none bg-transparent border-none cursor-pointer disabled:opacity-50 mx-auto"
-                            >
-                                {isResending ? (
-                                    <>
-                                        <Loader2 className="h-4 w-4 animate-spin" />
-                                        Sending...
-                                    </>
-                                ) : (
-                                    <>
-                                        <RefreshCw className="h-4 w-4" />
-                                        Resend verification code
-                                    </>
-                                )}
-                            </button>
-                        )}
-                    </div>
+  const handlePaste = (e) => {
+    const pasted = e.clipboardData.getData("text").trim();
+    if (!/^\d+$/.test(pasted)) return;
+    e.preventDefault();
+    const digits = pasted.slice(0, OTP_LENGTH).split("");
+    const newOtp = Array(OTP_LENGTH).fill("");
+    digits.forEach((d, i) => (newOtp[i] = d));
+    setOtp(newOtp);
+    const last = Math.min(digits.length, OTP_LENGTH - 1);
+    inputRefs.current[last]?.focus();
+  };
 
-                    {/* Submit Button */}
-                    <Button
-                        type="submit"
-                        className="w-full py-6 font-['Space_Grotesk'] font-bold flex items-center justify-center gap-2"
-                        disabled={isSubmitting || isResending || otp.join("").length !== 4}
-                    >
-                        {isSubmitting ? (
-                            <>
-                                <Loader2 className="h-4 w-4 animate-spin" />
-                                VERIFYING...
-                            </>
-                        ) : (
-                            "VERIFY EMAIL"
-                        )}
-                    </Button>
-                </form>
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    const code = otp.join("");
+    if (code.length !== OTP_LENGTH) {
+      toast({
+        title: "Incomplete OTP",
+        description: "Enter the 4-digit code from your email.",
+        variant: "destructive",
+      });
+      return;
+    }
+    setIsSubmitting(true);
+    try {
+      await verifyOTP(email, code);
+      toast({
+        title: "Email verified",
+        description: "You can now sign in.",
+      });
+      navigate("/login", { replace: true });
+    } catch (err) {
+      let msg = "Please try again or request a new code.";
+      if (err.message?.includes("expired"))
+        msg = "OTP expired. Please request a new code.";
+      else if (err.message?.includes("invalid"))
+        msg = "Invalid code. Double-check and try again.";
+      toast({
+        title: "Verification failed",
+        description: msg,
+        variant: "destructive",
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
-                {/* Help Text */}
-                <div className="mt-8 p-4 border border-[rgba(229,228,226,0.2)] bg-[rgba(229,228,226,0.05)]">
-                    <p className="text-xs text-[rgba(229,228,226,0.7)] text-center">
-                        Didn't receive the code? Check your spam folder or click resend after the timer expires.
-                        Make sure you entered the correct email address during registration.
-                    </p>
-                </div>
+  const handleResendOtp = async () => {
+    if (timer > 0) return;
+    setIsResending(true);
+    try {
+      await resendOTP(email);
+      setTimer(30);
+      setOtp(Array(OTP_LENGTH).fill(""));
+      inputRefs.current[0]?.focus();
+      toast({
+        title: "Code resent",
+        description: "Check your inbox for the new code.",
+      });
+    } catch (err) {
+      toast({
+        title: "Resend failed",
+        description: err.message || "Please try again later.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsResending(false);
+    }
+  };
+
+  if (!email) return null;
+  const isComplete = otp.join("").length === OTP_LENGTH;
+
+  return (
+    <div className="bg-bg min-h-screen pt-20 grid-bg-fine">
+      <Container size="sm" className="py-16 md:py-24">
+        <div className="mx-auto w-full max-w-md">
+          <div className="text-center mb-8">
+            <div className="mx-auto mb-6 w-14 h-14 border border-accent text-accent flex items-center justify-center bg-accent/5">
+              <Mail size={22} strokeWidth={1.5} />
             </div>
+            <h1 className="text-3xl md:text-4xl font-heading font-bold tracking-tight text-ink mb-3">
+              Verify your email<span className="text-accent">.</span>
+            </h1>
+            <p className="text-ink-muted text-sm">
+              We sent a 4-digit code to
+            </p>
+            <p className="text-ink font-medium break-all mt-1">{email}</p>
+          </div>
+
+          <div className="border border-ink-faint bg-surface p-7 md:p-9">
+            <form onSubmit={handleSubmit} className="grid gap-8">
+              {/* OTP grid */}
+              <div className="grid grid-cols-4 gap-3" onPaste={handlePaste}>
+                {otp.map((digit, idx) => (
+                  <input
+                    key={idx}
+                    ref={(el) => (inputRefs.current[idx] = el)}
+                    type="text"
+                    inputMode="numeric"
+                    maxLength={1}
+                    value={digit}
+                    onChange={(e) => handleOtpChange(idx, e.target.value)}
+                    onKeyDown={(e) => handleKeyDown(idx, e)}
+                    className={cn(
+                      "w-full aspect-square text-center text-2xl md:text-3xl font-heading font-bold",
+                      "bg-bg border text-ink outline-none transition-all",
+                      digit
+                        ? "border-accent shadow-[0_0_0_3px_var(--accent-glow)]"
+                        : "border-ink-faint",
+                      "focus:border-accent focus:shadow-[0_0_0_3px_var(--accent-glow)]",
+                      "disabled:opacity-50"
+                    )}
+                    aria-label={`Digit ${idx + 1}`}
+                    disabled={isSubmitting || isResending}
+                  />
+                ))}
+              </div>
+
+              {/* Resend */}
+              <div className="text-center">
+                {timer > 0 ? (
+                  <p className="text-sm text-ink-muted">
+                    Resend code in{" "}
+                    <span className="text-accent font-medium">{timer}s</span>
+                  </p>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={handleResendOtp}
+                    disabled={isSubmitting || isResending}
+                    className="inline-flex items-center gap-2 micro-text text-accent hover:text-ink transition-colors disabled:opacity-50"
+                  >
+                    {isResending ? (
+                      <>
+                        <Loader2 size={12} className="animate-spin" />
+                        Sending…
+                      </>
+                    ) : (
+                      <>
+                        <RefreshCw size={12} />
+                        Resend code
+                      </>
+                    )}
+                  </button>
+                )}
+              </div>
+
+              <Button
+                type="submit"
+                variant="accent"
+                size="lg"
+                className="w-full"
+                disabled={isSubmitting || isResending || !isComplete}
+              >
+                {isSubmitting ? (
+                  <>
+                    <Loader2 size={16} className="animate-spin" />
+                    Verifying…
+                  </>
+                ) : (
+                  <>
+                    <ShieldCheck size={16} />
+                    Verify email
+                  </>
+                )}
+              </Button>
+            </form>
+
+            <div className="mt-6 flex items-start gap-3 p-3 border border-ink-faint text-xs text-ink-subtle">
+              <Mail size={14} className="shrink-0 mt-0.5 text-accent" />
+              <p>
+                Can't find the email? Check your spam folder. The code expires
+                in 5 minutes.
+              </p>
+            </div>
+          </div>
+
+          <div className="mt-8 text-center">
+            <button
+              onClick={() => navigate("/register", { replace: true })}
+              disabled={isSubmitting || isResending}
+              className="inline-flex items-center gap-2 micro-text text-ink-subtle hover:text-ink transition-colors"
+            >
+              <ArrowLeft size={12} />
+              Back to register
+            </button>
+          </div>
         </div>
-    );
+      </Container>
+    </div>
+  );
 };
 
 export default OTPVerification;

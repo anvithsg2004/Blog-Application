@@ -1,365 +1,525 @@
 import React, { useState, useContext, useEffect, useRef } from "react";
-import { Link, useNavigate, useLocation } from "react-router-dom";
-import { Menu, X, LogOut, Bell } from "lucide-react";
-import { Button } from "./ui/button";
-import UserAvatar from "./UserAvatar";
+import { NavLink, Link, useNavigate, useLocation } from "react-router-dom";
+import { Menu, X, LogOut, Bell, PenSquare, User } from "lucide-react";
 import { AuthContext } from "../components/AuthContext";
 import apiFetch from "../components/utils/api";
+import { cn } from "@/lib/utils";
+import { relativeTime, isoDate } from "@/lib/time";
+import { Button } from "./ui/button";
+import UserAvatar from "./UserAvatar";
+
+const NAV_LINKS = [
+  { name: "Home", path: "/" },
+  { name: "Blogs", path: "/blogs" },
+];
 
 const Navbar = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [notifications, setNotifications] = useState([]);
-  const [isNotificationDropdownOpen, setIsNotificationDropdownOpen] = useState(false);
+  const [isNotificationOpen, setIsNotificationOpen] = useState(false);
   const navigate = useNavigate();
   const location = useLocation();
   const dropdownRef = useRef(null);
+
   const { isLoggedIn, user, loading, logout } = useContext(AuthContext) || {
     isLoggedIn: false,
     user: null,
     loading: false,
-    logout: () => { },
+    logout: () => {},
   };
 
-  // Fetch all notifications
+  // Fetch notifications when logged in
   useEffect(() => {
-    if (isLoggedIn && !loading) {
-      const fetchNotifications = async () => {
-        try {
-          // THIS IS THE FIX: The manual 'headers' object has been removed.
-          // Your 'apiFetch' service now handles authentication automatically.
-          const response = await apiFetch("/api/notifications");
-
-          if (response.ok) {
-            const data = await response.json();
-            setNotifications(data);
-          } else {
-            console.error("Failed to fetch notifications");
-          }
-        } catch (error) {
-          console.error("Error fetching notifications:", error);
-        }
-      };
-      fetchNotifications();
-    }
+    if (!isLoggedIn || loading) return;
+    let active = true;
+    (async () => {
+      try {
+        const res = await apiFetch("/api/notifications");
+        if (!res.ok || !active) return;
+        const data = await res.json();
+        setNotifications(data || []);
+      } catch (err) {
+        console.error("Failed to fetch notifications", err);
+      }
+    })();
+    return () => {
+      active = false;
+    };
   }, [isLoggedIn, loading]);
 
-  // Close dropdown when clicking outside
+  // Close notification dropdown on outside click
   useEffect(() => {
-    const handleClickOutside = (event) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
-        setIsNotificationDropdownOpen(false);
+    const handler = (e) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target)) {
+        setIsNotificationOpen(false);
       }
     };
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
   }, []);
 
-  // Log state changes
+  // Lock body scroll when mobile menu open
   useEffect(() => {
-    console.log("Navbar: isLoggedIn changed to", isLoggedIn, "user:", user);
-  }, [isLoggedIn, user]);
+    if (isMenuOpen) {
+      const original = document.body.style.overflow;
+      document.body.style.overflow = "hidden";
+      return () => {
+        document.body.style.overflow = original;
+      };
+    }
+  }, [isMenuOpen]);
 
+  // Close menu on route change
   useEffect(() => {
-    console.log("Route changed to", location.pathname);
-  }, [location]);
-
-  const handleProfileClick = () => {
-    console.log("handleProfileClick: isLoggedIn:", isLoggedIn, "user:", user, "loading:", loading);
-    if (loading) {
-      console.log("handleProfileClick: Still loading, delaying navigation");
-      return;
-    }
-    if (isLoggedIn) {
-      console.log("Navigating to /profile");
-      navigate("/profile");
-    } else {
-      console.log("Navigating to /login");
-      navigate("/login");
-    }
     setIsMenuOpen(false);
-  };
+    setIsNotificationOpen(false);
+  }, [location.pathname]);
 
-  const handleLogout = () => {
-    logout();
+  const unreadCount = notifications.filter((n) => !n.isRead).length;
+
+  const handleLogout = async () => {
+    await logout();
     navigate("/login");
-    setIsMenuOpen(false);
   };
 
-  const handleNotificationClick = () => {
-    setIsNotificationDropdownOpen(!isNotificationDropdownOpen);
-    setIsMenuOpen(false);
-  };
-
-  const handleNotificationItemClick = async (notification) => {
+  const handleNotificationClick = async (notification) => {
     try {
-      // FIX #2: Removed the manual 'headers' object here.
       await apiFetch(`/api/notifications/${notification.id}/mark-read`, {
         method: "POST",
       });
-
-      // FIX #3: Removed the manual 'headers' object here.
       await apiFetch(`/api/notifications/${notification.id}`, {
         method: "DELETE",
       });
-
-      // Update local state to remove the notification
       setNotifications((prev) => prev.filter((n) => n.id !== notification.id));
-
-      // Navigate to the blog
       navigate(`/blog/${notification.blogId}`);
-      setIsNotificationDropdownOpen(false);
-    } catch (error) {
-      console.error("Error handling notification click:", error);
+      setIsNotificationOpen(false);
+    } catch (err) {
+      console.error("Notification click error", err);
     }
   };
 
   if (loading) {
-    return <div className="h-20 bg-black flex items-center justify-center">
-      <div className="w-8 h-8 border-4 border-t-white border-r-white/30 border-b-white/10 border-l-white/60 rounded-full animate-spin"></div>
-    </div>;
+    return (
+      <nav className="fixed top-0 left-0 w-full z-50 bg-bg border-b border-ink-faint">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between">
+          <Logo />
+          <div className="w-6 h-6 border-2 border-t-accent border-r-ink/30 border-b-ink/10 border-l-ink/60 rounded-full animate-spin" />
+        </div>
+      </nav>
+    );
   }
 
   return (
-    <nav className="fixed top-0 left-0 w-full z-50 bg-black border-b border-[rgba(229,228,226,0.3)]">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between">
-        <Link
-          to="/"
-          className="text-2xl md:text-3xl font-['Space_Grotesk'] font-bold tracking-[-1px] text-white no-underline"
-        >
-          AIDEN
-        </Link>
-
-        {/* Desktop Links */}
-        <div className="hidden md:flex items-center gap-8">
-          <NavLinks isLoggedIn={isLoggedIn} />
-          {isLoggedIn ? (
-            <UserControls
-              userImage={user?.photo ? `data:image/jpeg;base64,${user.photo}` : null}
-              onProfileClick={handleProfileClick}
-              onLogout={handleLogout}
-              notifications={notifications}
-              onNotificationClick={handleNotificationClick}
-              isNotificationDropdownOpen={isNotificationDropdownOpen}
-              onNotificationItemClick={handleNotificationItemClick}
-              dropdownRef={dropdownRef}
-            />
-          ) : (
-            <AuthButtons />
-          )}
-        </div>
-
-        {/* Mobile Menu Button */}
-        <button
-          onClick={() => setIsMenuOpen(true)}
-          className="p-2 bg-transparent border-none text-white cursor-pointer transition-brutal hover:bg-[rgba(229,228,226,0.1)] md:hidden"
-        >
-          <Menu size={24} />
-        </button>
-      </div>
-
-      {/* Mobile Drawer */}
-      <div
-        className={`fixed inset-0 bg-black z-50 transform ${isMenuOpen ? "translate-x-0" : "translate-x-full"
-          } transition-transform duration-300 ease-in-out`}
-      >
-        <gatsby-focus-wrapper>
-          <div className="max-w-7xl mx-auto p-6">
-            <div className="flex justify-between items-center mb-10">
-              <Link
-                to="/"
-                className="text-2xl font-['Space_Grotesk'] font-bold tracking-[-1px] text-white no-underline"
-                onClick={() => setIsMenuOpen(false)}
-              >
-                AIDEN
-              </Link>
-              <button
-                onClick={() => setIsMenuOpen(false)}
-                className="p-2 bg-transparent border-none text-white cursor-pointer transition-brutal hover:bg-[rgba(229,228,226,0.1)]"
-              >
-                <X size={24} />
-              </button>
-            </div>
-
-            <div className="flex flex-col gap-8" onClick={() => setIsMenuOpen(false)}>
-              <NavLinks vertical isLoggedIn={isLoggedIn} />
-              <div className="pt-8 border-t border-[rgba(229,228,226,0.3)]">
-                {isLoggedIn ? (
-                  <div className="flex flex-col gap-4">
-                    <div>
-                      <button
-                        onClick={handleNotificationClick}
-                        className="flex items-center gap-2 text-white text-xl font-['Space_Grotesk'] font-bold no-underline bg-transparent border-none cursor-pointer transition-brutal hover:text-[#E5E4E2]"
-                      >
-                        <Bell size={20} />
-                        NOTIFICATIONS ({notifications.length})
-                      </button>
-                      {isNotificationDropdownOpen && (
-                        <div className="mt-2 bg-black border border-[rgba(229,228,226,0.3)] p-4 max-h-96 overflow-y-auto">
-                          {notifications.length === 0 ? (
-                            <p className="text-gray-400">No notifications available.</p>
-                          ) : (
-                            notifications.map((notification) => (
-                              <div
-                                key={notification.id}
-                                onClick={() => handleNotificationItemClick(notification)}
-                                className={`p-2 cursor-pointer hover:bg-[rgba(229,228,226,0.1)] ${notification.isRead ? "opacity-50" : ""
-                                  }`}
-                              >
-                                <p className="text-white font-['Space_Grotesk']">
-                                  <strong>{notification.blogTitle}</strong> by {notification.authorEmail}
-                                </p>
-                                <p className="text-sm text-gray-400">
-                                  {new Date(notification.createdAt).toLocaleString()}
-                                </p>
-                              </div>
-                            ))
-                          )}
-                        </div>
-                      )}
-                    </div>
-                    <div className="flex items-center gap-4">
-                      <UserAvatar
-                        userImage={user?.photo ? `data:image/jpeg;base64,${user.photo}` : null}
-                        size="lg"
-                        onClick={handleProfileClick}
-                      />
-                      <div>
-                        <button
-                          onClick={handleProfileClick}
-                          className="text-white text-xl font-['Space_Grotesk'] font-bold no-underline bg-transparent border-none cursor-pointer transition-brutal hover:text-[#E5E4E2]"
-                        >
-                          MY PROFILE
-                        </button>
-                      </div>
-                    </div>
-                    <button
-                      onClick={handleLogout}
-                      className="flex items-center gap-2 text-white text-xl font-['Space_Grotesk'] font-bold no-underline bg-transparent border-none cursor-pointer transition-brutal hover:text-[#E5E4E2]"
-                    >
-                      <LogOut size={20} />
-                      LOGOUT
-                    </button>
-                  </div>
-                ) : (
-                  <AuthButtons vertical />
-                )}
-              </div>
-            </div>
-          </div>
-        </gatsby-focus-wrapper>
-      </div>
-    </nav>
-  );
-};
-
-const NavLinks = ({ vertical = false, isLoggedIn = false }) => {
-  const links = [
-    { name: "HOME", path: "/" },
-    { name: "BLOGS", path: "/blogs" },
-    ...(isLoggedIn ? [] : [{ name: "WRITE", path: "/write-blog" }]),
-  ];
-
-  return (
     <>
-      {links.map((link) => (
-        <Link
-          key={link.path}
-          to={link.path}
-          className={`${vertical ? "text-xl py-2" : "text-xs uppercase tracking-[1px]"} text-white no-underline transition-brutal hover:text-[#E5E4E2] ${!vertical ? "hover:-translate-y-0.5" : ""
-            }`}
-        >
-          {link.name}
-        </Link>
-      ))}
+      <nav className="fixed top-0 left-0 w-full z-50 bg-bg/85 backdrop-blur-md border-b border-ink-faint">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between">
+          <Logo />
+
+          {/* Desktop nav */}
+          <div className="hidden md:flex items-center gap-10">
+            <DesktopLinks />
+            {isLoggedIn ? (
+              <DesktopUserMenu
+                user={user}
+                notifications={notifications}
+                unreadCount={unreadCount}
+                isNotificationOpen={isNotificationOpen}
+                onNotificationToggle={() =>
+                  setIsNotificationOpen((v) => !v)
+                }
+                onNotificationClick={handleNotificationClick}
+                onLogout={handleLogout}
+                dropdownRef={dropdownRef}
+              />
+            ) : (
+              <AuthButtons />
+            )}
+          </div>
+
+          {/* Mobile menu trigger */}
+          <button
+            onClick={() => setIsMenuOpen(true)}
+            className="md:hidden p-2 text-ink hover:text-accent transition-colors"
+            aria-label="Open menu"
+          >
+            <Menu size={24} />
+          </button>
+        </div>
+      </nav>
+
+      {/* Mobile drawer */}
+      <MobileDrawer
+        open={isMenuOpen}
+        onClose={() => setIsMenuOpen(false)}
+        isLoggedIn={isLoggedIn}
+        user={user}
+        notifications={notifications}
+        unreadCount={unreadCount}
+        onNotificationClick={handleNotificationClick}
+        onLogout={handleLogout}
+      />
     </>
   );
 };
 
-const UserControls = ({
-  userImage,
-  onProfileClick,
-  onLogout,
+/* ---------- Sub-components ---------- */
+
+const Logo = () => (
+  <Link
+    to="/"
+    className="text-2xl md:text-3xl font-heading font-bold tracking-tight text-ink no-underline flex items-center"
+    aria-label="AIDEN home"
+  >
+    AIDEN<span className="text-accent">.</span>
+  </Link>
+);
+
+const DesktopLinks = () => (
+  <div className="flex items-center gap-8">
+    {NAV_LINKS.map((link) => (
+      <NavLink
+        key={link.path}
+        to={link.path}
+        end={link.path === "/"}
+        className={({ isActive }) =>
+          cn(
+            "relative micro-text no-underline transition-colors py-1.5",
+            isActive
+              ? "text-accent active"
+              : "text-ink-muted hover:text-ink"
+          )
+        }
+      >
+        {({ isActive }) => (
+          <>
+            {link.name}
+            <span
+              aria-hidden
+              className={cn(
+                "absolute left-0 -bottom-0.5 h-px bg-accent transition-[width] duration-200 ease-brutal",
+                isActive ? "w-full" : "w-0"
+              )}
+            />
+          </>
+        )}
+      </NavLink>
+    ))}
+  </div>
+);
+
+const DesktopUserMenu = ({
+  user,
   notifications,
+  unreadCount,
+  isNotificationOpen,
+  onNotificationToggle,
   onNotificationClick,
-  isNotificationDropdownOpen,
-  onNotificationItemClick,
+  onLogout,
   dropdownRef,
 }) => (
   <div className="flex items-center gap-4">
-    <Link
-      to="/write-blog"
-      className="text-xs uppercase tracking-[1px] text-white no-underline transition-brutal hover:text-[#E5E4E2] hover:-translate-y-0.5"
+    <Button
+      asChild
+      variant="accent"
+      size="sm"
+      className="hidden lg:inline-flex"
     >
-      WRITE
-    </Link>
+      <Link to="/write-blog">
+        <PenSquare size={14} />
+        Write
+      </Link>
+    </Button>
+
     <div className="relative" ref={dropdownRef}>
       <button
-        onClick={onNotificationClick}
-        className="relative text-white transition-brutal hover:text-[#E5E4E2] hover:-translate-y-0.5"
+        onClick={onNotificationToggle}
+        className={cn(
+          "relative w-10 h-10 border flex items-center justify-center transition-colors",
+          isNotificationOpen
+            ? "border-accent text-accent"
+            : "border-ink-faint text-ink-muted hover:text-ink hover:border-ink"
+        )}
+        aria-label="Notifications"
+        aria-expanded={isNotificationOpen}
       >
-        <Bell size={20} />
-        {notifications.filter((n) => !n.isRead).length > 0 && (
-          <span className="absolute -top-2 -right-2 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
-            {notifications.filter((n) => !n.isRead).length}
+        <Bell size={18} />
+        {unreadCount > 0 && (
+          <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 bg-accent text-accent-ink text-[10px] font-bold flex items-center justify-center animate-pulse-dot">
+            {unreadCount}
           </span>
         )}
       </button>
-      {isNotificationDropdownOpen && (
-        <div className="absolute right-0 mt-2 w-80 bg-black border border-[rgba(229,228,226,0.3)] shadow-lg z-50 max-h-96 overflow-y-auto">
-          {notifications.length === 0 ? (
-            <div className="p-4 text-gray-400">No notifications available.</div>
-          ) : (
-            notifications.map((notification) => (
-              <div
-                key={notification.id}
-                onClick={() => onNotificationItemClick(notification)}
-                className={`p-4 cursor-pointer hover:bg-[rgba(229,228,226,0.1)] ${notification.isRead ? "opacity-50" : ""
-                  }`}
-              >
-                <p className="text-white font-['Space_Grotesk']">
-                  <strong>{notification.blogTitle}</strong> by {notification.authorEmail}
-                </p>
-                <p className="text-sm text-gray-400">
-                  {new Date(notification.createdAt).toLocaleString()}
-                </p>
-              </div>
-            ))
-          )}
-        </div>
+
+      {isNotificationOpen && (
+        <NotificationPanel
+          notifications={notifications}
+          onClick={onNotificationClick}
+        />
       )}
     </div>
-    <button
-      onClick={onProfileClick}
-      className="text-xs uppercase tracking-[1px] text-white no-underline transition-brutal hover:text-[#E5E4E2] hover:-translate-y-0.5"
+
+    <Link
+      to="/profile"
+      className="flex items-center gap-2 micro-text text-ink-muted hover:text-ink transition-colors"
+      aria-label="Profile"
     >
-      MY PROFILE
-    </button>
+      <UserAvatar
+        userImage={user?.photo ? `data:image/jpeg;base64,${user.photo}` : null}
+        size="sm"
+      />
+    </Link>
+
     <button
       onClick={onLogout}
-      className="text-xs uppercase tracking-[1px] text-white no-underline transition-brutal hover:text-[#E5E4E2] hover:-translate-y-0.5 flex items-center gap-1"
+      className="micro-text text-ink-muted hover:text-danger transition-colors flex items-center gap-2"
+      aria-label="Log out"
     >
-      <LogOut size={16} />
-      LOGOUT
+      <LogOut size={14} />
+      <span className="hidden xl:inline">Logout</span>
     </button>
   </div>
 );
 
-const AuthButtons = ({ vertical = false }) => (
-  <div className={`flex ${vertical ? "flex-col" : "flex-row"} gap-4`}>
-    <Link to="/login">
-      <Button
-        variant="outline"
-        className="font-['Space_Grotesk'] font-bold hover:bg-[#E5E4E2] hover:text-black"
-      >
-        LOGIN
-      </Button>
-    </Link>
-    <Link to="/register">
-      <Button className="font-['Space_Grotesk'] font-bold hover:bg-[#E5E4E2] hover:text-black">
-        REGISTER
-      </Button>
-    </Link>
+const NotificationPanel = ({ notifications, onClick }) => (
+  <div
+    className="absolute right-0 mt-2 w-[360px] max-w-[90vw] bg-surface border border-ink-faint shadow-brutal z-50 animate-fade-up"
+    role="menu"
+  >
+    <div className="px-4 py-3 border-b border-ink-faint flex items-center justify-between">
+      <div className="micro-text text-ink-subtle">Notifications</div>
+      {notifications.length > 0 && (
+        <div className="text-[10px] text-ink-subtle">
+          {notifications.length} total
+        </div>
+      )}
+    </div>
+    <div className="max-h-96 overflow-y-auto">
+      {notifications.length === 0 ? (
+        <div className="p-8 text-center">
+          <div className="mx-auto mb-3 w-10 h-10 border border-ink-faint flex items-center justify-center text-ink-subtle">
+            <Bell size={16} />
+          </div>
+          <p className="text-sm text-ink-muted">You're all caught up.</p>
+        </div>
+      ) : (
+        notifications.map((n) => (
+          <button
+            key={n.id}
+            onClick={() => onClick(n)}
+            className={cn(
+              "w-full text-left px-4 py-3 border-b border-ink-faint/60 last:border-b-0",
+              "transition-colors hover:bg-surface-2",
+              "flex items-start gap-3"
+            )}
+          >
+            <span
+              className={cn(
+                "mt-1.5 inline-block w-1.5 h-1.5 shrink-0",
+                n.isRead ? "bg-ink-faint" : "bg-accent"
+              )}
+            />
+            <div className="min-w-0 flex-1">
+              <p className="text-sm text-ink font-medium truncate">
+                {n.blogTitle}
+              </p>
+              <p className="text-xs text-ink-subtle truncate">
+                by {n.authorEmail}
+              </p>
+              <time
+                dateTime={isoDate(n.createdAt)}
+                title={
+                  n.createdAt ? new Date(n.createdAt).toLocaleString() : ""
+                }
+                className="text-[10px] text-ink-faint mt-1 block"
+              >
+                {relativeTime(n.createdAt)}
+              </time>
+            </div>
+          </button>
+        ))
+      )}
+    </div>
   </div>
 );
+
+const AuthButtons = () => (
+  <div className="flex items-center gap-3">
+    <Button asChild variant="ghost" size="sm">
+      <Link to="/login">Sign in</Link>
+    </Button>
+    <Button asChild variant="accent" size="sm">
+      <Link to="/register">Get started</Link>
+    </Button>
+  </div>
+);
+
+/* ---------- Mobile drawer ---------- */
+
+const MobileDrawer = ({
+  open,
+  onClose,
+  isLoggedIn,
+  user,
+  notifications,
+  unreadCount,
+  onNotificationClick,
+  onLogout,
+}) => {
+  return (
+    <>
+      <div
+        className={cn(
+          "fixed inset-0 z-[60] bg-bg/70 backdrop-blur-sm transition-opacity duration-300 md:hidden",
+          open ? "opacity-100" : "opacity-0 pointer-events-none"
+        )}
+        onClick={onClose}
+        aria-hidden={!open}
+      />
+      <aside
+        className={cn(
+          "fixed top-0 right-0 z-[70] h-full w-full max-w-sm bg-bg border-l border-ink-faint md:hidden",
+          "transition-transform duration-300 ease-brutal",
+          open ? "translate-x-0" : "translate-x-full"
+        )}
+        role="dialog"
+        aria-modal="true"
+      >
+        <div className="flex items-center justify-between h-20 px-6 border-b border-ink-faint">
+          <Logo />
+          <button
+            onClick={onClose}
+            className="p-2 text-ink hover:text-accent transition-colors"
+            aria-label="Close menu"
+          >
+            <X size={24} />
+          </button>
+        </div>
+
+        <div className="px-6 py-8 grid gap-2">
+          {NAV_LINKS.map((link) => (
+            <NavLink
+              key={link.path}
+              to={link.path}
+              end={link.path === "/"}
+              onClick={onClose}
+              className={({ isActive }) =>
+                cn(
+                  "block py-3 text-2xl font-heading font-bold tracking-tight no-underline",
+                  isActive ? "text-accent" : "text-ink hover:text-accent"
+                )
+              }
+            >
+              {link.name}
+            </NavLink>
+          ))}
+          {isLoggedIn && (
+            <NavLink
+              to="/write-blog"
+              onClick={onClose}
+              className={({ isActive }) =>
+                cn(
+                  "block py-3 text-2xl font-heading font-bold tracking-tight no-underline",
+                  isActive ? "text-accent" : "text-ink hover:text-accent"
+                )
+              }
+            >
+              Write
+            </NavLink>
+          )}
+        </div>
+
+        <div className="mx-6 border-t border-ink-faint pt-6">
+          {isLoggedIn ? (
+            <div className="grid gap-4">
+              <div className="flex items-center gap-3">
+                <UserAvatar
+                  userImage={
+                    user?.photo ? `data:image/jpeg;base64,${user.photo}` : null
+                  }
+                  size="md"
+                />
+                <div>
+                  <div className="text-sm text-ink font-medium">
+                    {user?.name || "User"}
+                  </div>
+                  <div className="text-xs text-ink-subtle truncate max-w-[180px]">
+                    {user?.email || ""}
+                  </div>
+                </div>
+              </div>
+
+              <Link
+                to="/profile"
+                onClick={onClose}
+                className="flex items-center gap-3 py-3 micro-text text-ink-muted hover:text-ink"
+              >
+                <User size={14} /> My profile
+              </Link>
+
+              <details className="group">
+                <summary className="flex items-center gap-3 py-3 micro-text text-ink-muted hover:text-ink cursor-pointer list-none">
+                  <Bell size={14} /> Notifications
+                  {unreadCount > 0 && (
+                    <span className="ml-auto inline-flex items-center justify-center min-w-[20px] h-5 px-1.5 bg-accent text-accent-ink text-[10px] font-bold">
+                      {unreadCount}
+                    </span>
+                  )}
+                </summary>
+                <div className="mt-2 max-h-72 overflow-y-auto border border-ink-faint">
+                  {notifications.length === 0 ? (
+                    <p className="p-4 text-sm text-ink-subtle text-center">
+                      You're all caught up.
+                    </p>
+                  ) : (
+                    notifications.map((n) => (
+                      <button
+                        key={n.id}
+                        onClick={() => {
+                          onNotificationClick(n);
+                          onClose();
+                        }}
+                        className="w-full text-left px-4 py-3 border-b border-ink-faint/60 last:border-b-0 hover:bg-surface-2"
+                      >
+                        <p className="text-sm text-ink font-medium truncate">
+                          {n.blogTitle}
+                        </p>
+                        <p className="text-xs text-ink-subtle truncate">
+                          by {n.authorEmail}
+                        </p>
+                      </button>
+                    ))
+                  )}
+                </div>
+              </details>
+
+              <button
+                onClick={() => {
+                  onLogout();
+                  onClose();
+                }}
+                className="flex items-center gap-3 py-3 micro-text text-ink-muted hover:text-danger transition-colors"
+              >
+                <LogOut size={14} /> Logout
+              </button>
+            </div>
+          ) : (
+            <div className="grid gap-3">
+              <Button asChild variant="outline" size="lg" className="w-full">
+                <Link to="/login" onClick={onClose}>
+                  Sign in
+                </Link>
+              </Button>
+              <Button asChild variant="accent" size="lg" className="w-full">
+                <Link to="/register" onClick={onClose}>
+                  Get started
+                </Link>
+              </Button>
+            </div>
+          )}
+        </div>
+      </aside>
+    </>
+  );
+};
 
 export default Navbar;

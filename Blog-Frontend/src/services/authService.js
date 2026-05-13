@@ -2,9 +2,16 @@
  * Unified Authentication Service
  * Handles both OAuth and Basic Auth with OTP verification
  */
-// const API_BASE_URL = "http://localhost:8080"
 
-const API_BASE_URL = "https://blogs-backend-w9x0.onrender.com";
+// Resolves to:
+//   - VITE_API_BASE_URL (if you set it in .env / Netlify env vars)
+//   - http://localhost:8080  for `npm run dev`
+//   - https://blogs-backend-w9x0.onrender.com  for production builds
+const API_BASE_URL =
+    import.meta.env.VITE_API_BASE_URL ||
+    (import.meta.env.PROD
+        ? "https://blogs-backend-w9x0.onrender.com"
+        : "http://localhost:8080");
 
 class AuthService {
     constructor() {

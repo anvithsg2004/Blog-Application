@@ -1,9 +1,19 @@
 import React, { useState, useContext } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import {
+  Github,
+  Chrome,
+  Loader2,
+  Info,
+  Camera,
+  ArrowRight,
+  X as XIcon,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { AuthContext } from "../AuthContext";
-import { Github, Chrome, Loader2, Info } from "lucide-react";
+import { Container } from "@/components/shared/Container";
+import { Field, Input, Textarea, PasswordInput } from "@/components/shared/Field";
 
 const Register = () => {
   const { toast } = useToast();
@@ -21,72 +31,51 @@ const Register = () => {
     twitter: "",
     about: "",
   });
-
   const [previewUrl, setPreviewUrl] = useState(null);
   const [loading, setLoading] = useState(false);
   const [oauthLoading, setOauthLoading] = useState({ google: false, github: false });
 
-  const handleChange = (e) => {
-    const { name, value } = e.target;
-    setFormData({
-      ...formData,
-      [name]: value,
-    });
-  };
+  const handleChange = (e) =>
+    setFormData((prev) => ({ ...prev, [e.target.name]: e.target.value }));
 
   const handleFileChange = (e) => {
     if (e.target.files && e.target.files[0]) {
       const file = e.target.files[0];
-      setFormData({
-        ...formData,
-        photo: file,
-      });
-
-      // Create a preview URL
-      const fileReader = new FileReader();
-      fileReader.onload = () => {
-        if (fileReader.result) {
-          setPreviewUrl(fileReader.result);
-        }
-      };
-      fileReader.readAsDataURL(file);
+      setFormData((prev) => ({ ...prev, photo: file }));
+      const reader = new FileReader();
+      reader.onload = () => setPreviewUrl(reader.result);
+      reader.readAsDataURL(file);
     }
+  };
+
+  const handleRemovePhoto = () => {
+    setFormData((prev) => ({ ...prev, photo: null }));
+    setPreviewUrl(null);
   };
 
   const handleOAuthSignup = async (provider) => {
     try {
-      setOauthLoading(prev => ({ ...prev, [provider]: true }));
-
+      setOauthLoading((prev) => ({ ...prev, [provider]: true }));
       toast({
-        title: "Redirecting...",
-        description: `Taking you to ${provider === 'google' ? 'Google' : 'GitHub'} to create your account.`,
-        variant: "default",
+        title: "Redirecting…",
+        description: `Taking you to ${provider === "google" ? "Google" : "GitHub"}.`,
       });
-
-      // Small delay to show the loading state
-      setTimeout(() => {
-        loginWithOAuth(provider);
-      }, 500);
-
-    } catch (error) {
-      console.error(`${provider} OAuth error:`, error);
+      setTimeout(() => loginWithOAuth(provider), 500);
+    } catch {
       toast({
-        title: "Authentication Error",
-        description: `Failed to initiate ${provider} signup. Please try again.`,
+        title: "Authentication error",
+        description: `Failed to start ${provider} signup.`,
         variant: "destructive",
       });
-      setOauthLoading(prev => ({ ...prev, [provider]: false }));
+      setOauthLoading((prev) => ({ ...prev, [provider]: false }));
     }
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
-
     try {
-      // Prepare form data for multipart request
       const data = new FormData();
-      // Stringify the user data and append it as the "user" part
       const userData = {
         name: formData.name,
         email: formData.email,
@@ -98,24 +87,18 @@ const Register = () => {
         about: formData.about,
       };
       data.append("user", JSON.stringify(userData));
-      if (formData.photo) {
-        data.append("photo", formData.photo);
-      }
+      if (formData.photo) data.append("photo", formData.photo);
 
       const response = await register(data);
-
       toast({
-        title: "Registration Successful",
-        description: "Please verify your email with the OTP sent.",
-        variant: "success",
+        title: "Account created",
+        description: "Please verify your email with the OTP we just sent.",
       });
-
-      // Navigate to OTP verification page with email
       navigate("/verify-otp", { state: { email: response.email } });
     } catch (error) {
       toast({
-        title: "Registration Failed",
-        description: error.message || "An error occurred while registering.",
+        title: "Registration failed",
+        description: error.message || "Something went wrong. Please try again.",
         variant: "destructive",
       });
     } finally {
@@ -123,313 +106,271 @@ const Register = () => {
     }
   };
 
+  const anyLoading = loading || oauthLoading.google || oauthLoading.github;
+
   return (
-    <div className="pt-20 min-h-screen flex items-center justify-center bg-black py-16 px-6">
-      <div className="w-full max-w-2xl border-4 border-white p-8 md:p-12 brutal-shadow">
-        <div className="mb-8 text-center">
-          <h1 className="text-3xl md:text-4xl font-['Space_Grotesk'] font-bold tracking-[-1px] text-white mb-4">
-            CREATE ACCOUNT
-          </h1>
-          <p className="text-[rgba(229,228,226,0.8)]">
-            Join our community of writers and share your knowledge
+    <div className="bg-bg min-h-screen pt-20 grid-bg-fine">
+      <Container size="default" className="py-16 md:py-24">
+        <div className="mx-auto w-full max-w-3xl">
+          {/* Header */}
+          <div className="text-center mb-10">
+            <div className="inline-flex items-center gap-2 micro-text text-accent mb-5">
+              <span className="inline-block w-6 h-px bg-accent" />
+              Create account
+              <span className="inline-block w-6 h-px bg-accent" />
+            </div>
+            <h1 className="text-4xl md:text-5xl font-heading font-bold tracking-tight text-ink mb-3">
+              Start writing today<span className="text-accent">.</span>
+            </h1>
+            <p className="text-ink-muted max-w-xl mx-auto">
+              Join a community of developers and writers shipping ideas worth
+              reading.
+            </p>
+          </div>
+
+          <div className="border border-ink-faint bg-surface p-7 md:p-10">
+            {/* OAuth */}
+            <div className="grid sm:grid-cols-2 gap-3 mb-6">
+              <Button
+                onClick={() => handleOAuthSignup("google")}
+                disabled={anyLoading}
+                variant="subtle"
+                size="lg"
+                className="w-full"
+              >
+                {oauthLoading.google ? (
+                  <Loader2 size={16} className="animate-spin" />
+                ) : (
+                  <Chrome size={16} />
+                )}
+                {oauthLoading.google ? "Connecting…" : "Google"}
+              </Button>
+              <Button
+                onClick={() => handleOAuthSignup("github")}
+                disabled={anyLoading}
+                variant="subtle"
+                size="lg"
+                className="w-full"
+              >
+                {oauthLoading.github ? (
+                  <Loader2 size={16} className="animate-spin" />
+                ) : (
+                  <Github size={16} />
+                )}
+                {oauthLoading.github ? "Connecting…" : "GitHub"}
+              </Button>
+            </div>
+
+            <div className="flex items-start gap-3 p-3 mb-7 border border-accent/30 bg-accent/5 text-xs text-ink-muted">
+              <Info size={14} className="shrink-0 mt-0.5 text-accent" />
+              <p>
+                OAuth signup is instant — no email verification needed. Your
+                account is ready immediately.
+              </p>
+            </div>
+
+            <Divider label="or with email" />
+
+            {/* Form */}
+            <form onSubmit={handleSubmit} className="grid gap-6 mt-7">
+              <div className="grid md:grid-cols-2 gap-5">
+                <Field id="name" label="Full name" required>
+                  <Input
+                    id="name"
+                    name="name"
+                    type="text"
+                    value={formData.name}
+                    onChange={handleChange}
+                    placeholder="Jane Doe"
+                    required
+                    disabled={anyLoading}
+                  />
+                </Field>
+                <Field id="email" label="Email" required>
+                  <Input
+                    id="email"
+                    name="email"
+                    type="email"
+                    value={formData.email}
+                    onChange={handleChange}
+                    placeholder="you@example.com"
+                    required
+                    disabled={anyLoading}
+                  />
+                </Field>
+                <Field id="password" label="Password" required>
+                  <PasswordInput
+                    id="password"
+                    name="password"
+                    value={formData.password}
+                    onChange={handleChange}
+                    placeholder="••••••••"
+                    required
+                    disabled={anyLoading}
+                    autoComplete="new-password"
+                  />
+                </Field>
+                <Field id="phone" label="Phone" hint="Optional · No +91 prefix">
+                  <Input
+                    id="phone"
+                    name="phone"
+                    type="tel"
+                    value={formData.phone}
+                    onChange={handleChange}
+                    placeholder="9876543210"
+                    disabled={anyLoading}
+                  />
+                </Field>
+              </div>
+
+              {/* Photo */}
+              <Field id="photo" label="Profile photo" hint="Optional · PNG, JPG up to 10MB">
+                <div className="flex items-stretch gap-4">
+                  <label
+                    htmlFor="photo"
+                    className="flex-1 cursor-pointer border border-dashed border-ink-faint hover:border-accent p-5 flex flex-col items-center justify-center text-center transition-colors"
+                  >
+                    <Camera
+                      size={24}
+                      className="mb-2 text-ink-subtle"
+                      strokeWidth={1.5}
+                    />
+                    <span className="text-sm text-ink-muted">
+                      {formData.photo ? formData.photo.name : "Click to upload"}
+                    </span>
+                    <input
+                      id="photo"
+                      type="file"
+                      accept="image/*"
+                      onChange={handleFileChange}
+                      className="hidden"
+                      disabled={anyLoading}
+                    />
+                  </label>
+                  {previewUrl && (
+                    <div className="relative w-24 h-24 border border-ink-faint">
+                      <img
+                        src={previewUrl}
+                        alt="Preview"
+                        className="w-full h-full object-cover"
+                      />
+                      <button
+                        type="button"
+                        onClick={handleRemovePhoto}
+                        className="absolute -top-2 -right-2 w-6 h-6 bg-bg border border-danger text-danger flex items-center justify-center hover:bg-danger hover:text-ink transition-colors"
+                        aria-label="Remove photo"
+                      >
+                        <XIcon size={12} />
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </Field>
+
+              <div className="grid md:grid-cols-2 gap-5">
+                <Field id="linkedin" label="LinkedIn" hint="Optional">
+                  <Input
+                    id="linkedin"
+                    name="linkedin"
+                    type="url"
+                    value={formData.linkedin}
+                    onChange={handleChange}
+                    placeholder="https://linkedin.com/in/…"
+                    disabled={anyLoading}
+                  />
+                </Field>
+                <Field id="github" label="GitHub" hint="Optional">
+                  <Input
+                    id="github"
+                    name="github"
+                    type="url"
+                    value={formData.github}
+                    onChange={handleChange}
+                    placeholder="https://github.com/…"
+                    disabled={anyLoading}
+                  />
+                </Field>
+              </div>
+
+              <Field id="twitter" label="X (Twitter)" hint="Optional">
+                <Input
+                  id="twitter"
+                  name="twitter"
+                  type="url"
+                  value={formData.twitter}
+                  onChange={handleChange}
+                  placeholder="https://twitter.com/…"
+                  disabled={anyLoading}
+                />
+              </Field>
+
+              <Field id="about" label="About you" hint="Optional · A short bio">
+                <Textarea
+                  id="about"
+                  name="about"
+                  value={formData.about}
+                  onChange={handleChange}
+                  placeholder="What do you write about?"
+                  disabled={anyLoading}
+                />
+              </Field>
+
+              <div className="flex items-start gap-3 p-3 border border-ink-faint text-xs text-ink-subtle">
+                <Info size={14} className="shrink-0 mt-0.5 text-accent" />
+                <p>
+                  You'll receive a 4-digit OTP to verify your email after
+                  registration.
+                </p>
+              </div>
+
+              <Button
+                type="submit"
+                variant="accent"
+                size="lg"
+                className="w-full mt-2"
+                disabled={anyLoading}
+              >
+                {loading ? (
+                  <>
+                    <Loader2 size={16} className="animate-spin" />
+                    Creating account…
+                  </>
+                ) : (
+                  <>
+                    Create account
+                    <ArrowRight size={16} />
+                  </>
+                )}
+              </Button>
+            </form>
+          </div>
+
+          <p className="mt-8 text-center text-sm text-ink-muted">
+            Already have an account?{" "}
+            <Link
+              to="/login"
+              className="text-accent hover:text-ink transition-colors underline underline-offset-4"
+            >
+              Sign in
+            </Link>
           </p>
         </div>
-
-        {/* OAuth Signup Buttons */}
-        <div className="grid gap-4 mb-8">
-          <Button
-            onClick={() => handleOAuthSignup('google')}
-            disabled={oauthLoading.google || oauthLoading.github || loading}
-            variant="outline"
-            className="w-full py-6 font-['Space_Grotesk'] font-bold flex items-center justify-center gap-3 hover:bg-[rgba(229,228,226,0.1)]"
-          >
-            {oauthLoading.google ? (
-              <Loader2 className="h-5 w-5 animate-spin" />
-            ) : (
-              <Chrome className="h-5 w-5" />
-            )}
-            {oauthLoading.google ? "CONNECTING..." : "SIGN UP WITH GOOGLE"}
-          </Button>
-
-          <Button
-            onClick={() => handleOAuthSignup('github')}
-            disabled={oauthLoading.google || oauthLoading.github || loading}
-            variant="outline"
-            className="w-full py-6 font-['Space_Grotesk'] font-bold flex items-center justify-center gap-3 hover:bg-[rgba(229,228,226,0.1)]"
-          >
-            {oauthLoading.github ? (
-              <Loader2 className="h-5 w-5 animate-spin" />
-            ) : (
-              <Github className="h-5 w-5" />
-            )}
-            {oauthLoading.github ? "CONNECTING..." : "SIGN UP WITH GITHUB"}
-          </Button>
-        </div>
-
-        {/* OAuth Benefits Notice */}
-        <div className="mb-8 p-4 border border-[rgba(229,228,226,0.2)] bg-[rgba(229,228,226,0.05)] flex items-start gap-3">
-          <Info className="h-5 w-5 text-[rgba(229,228,226,0.7)] flex-shrink-0 mt-0.5" />
-          <div>
-            <p className="text-sm text-[rgba(229,228,226,0.8)] font-semibold mb-1">
-              Quick & Secure OAuth Signup
-            </p>
-            <p className="text-xs text-[rgba(229,228,226,0.7)]">
-              OAuth signup is instant - no email verification required. Your account will be ready immediately.
-            </p>
-          </div>
-        </div>
-
-        {/* Divider */}
-        <div className="relative mb-8">
-          <div className="absolute inset-0 flex items-center">
-            <div className="w-full border-t border-[rgba(229,228,226,0.3)]"></div>
-          </div>
-          <div className="relative flex justify-center text-sm">
-            <span className="px-4 bg-black text-[rgba(229,228,226,0.6)] uppercase tracking-[1px]">
-              Or create account with email
-            </span>
-          </div>
-        </div>
-
-        {/* Email Registration Form */}
-        <form onSubmit={handleSubmit} className="grid gap-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {/* Name Input */}
-            <div className="grid gap-2">
-              <label
-                htmlFor="name"
-                className="uppercase text-xs tracking-[1px] text-[#E5E4E2]"
-              >
-                Full Name
-              </label>
-              <input
-                id="name"
-                className="w-full p-4 bg-black border border-[rgba(229,228,226,0.5)] focus:border-white text-white outline-none inset-shadow transition-brutal disabled:opacity-50"
-                name="name"
-                type="text"
-                value={formData.name}
-                onChange={handleChange}
-                placeholder="John Doe"
-                required
-                disabled={loading || oauthLoading.google || oauthLoading.github}
-              />
-            </div>
-
-            {/* Email Input */}
-            <div className="grid gap-2">
-              <label
-                htmlFor="email"
-                className="uppercase text-xs tracking-[1px] text-[#E5E4E2]"
-              >
-                Email
-              </label>
-              <input
-                id="email"
-                className="w-full p-4 bg-black border border-[rgba(229,228,226,0.5)] focus:border-white text-white outline-none inset-shadow transition-brutal disabled:opacity-50"
-                name="email"
-                type="email"
-                value={formData.email}
-                onChange={handleChange}
-                placeholder="your.email@example.com"
-                required
-                disabled={loading || oauthLoading.google || oauthLoading.github}
-              />
-            </div>
-
-            {/* Password Input */}
-            <div className="grid gap-2">
-              <label
-                htmlFor="password"
-                className="uppercase text-xs tracking-[1px] text-[#E5E4E2]"
-              >
-                Password
-              </label>
-              <input
-                id="password"
-                className="w-full p-4 bg-black border border-[rgba(229,228,226,0.5)] focus:border-white text-white outline-none inset-shadow transition-brutal disabled:opacity-50"
-                name="password"
-                type="password"
-                value={formData.password}
-                onChange={handleChange}
-                placeholder="••••••••"
-                required
-                disabled={loading || oauthLoading.google || oauthLoading.github}
-              />
-            </div>
-
-            {/* Phone Input */}
-            <div className="grid gap-2">
-              <label
-                htmlFor="phone"
-                className="uppercase text-xs tracking-[1px] text-[#E5E4E2]"
-              >
-                Phone Number
-              </label>
-              <input
-                id="phone"
-                className="w-full p-4 bg-black border border-[rgba(229,228,226,0.5)] focus:border-white text-white outline-none inset-shadow transition-brutal disabled:opacity-50"
-                name="phone"
-                type="tel"
-                value={formData.phone}
-                onChange={handleChange}
-                placeholder="Do not add +91"
-                disabled={loading || oauthLoading.google || oauthLoading.github}
-              />
-            </div>
-
-            {/* Photo Input */}
-            <div className="grid gap-2">
-              <label
-                htmlFor="photo"
-                className="uppercase text-xs tracking-[1px] text-[#E5E4E2]"
-              >
-                Photo
-              </label>
-              <div className="relative">
-                <input
-                  id="photo"
-                  className="w-full p-3 bg-black border border-[rgba(229,228,226,0.5)] focus:border-white text-white outline-none transition-brutal file:mr-4 file:py-2 file:px-4 file:rounded-none file:border-0 file:text-sm file:font-medium file:bg-[rgba(229,228,226,0.2)] file:text-white hover:file:bg-[rgba(229,228,226,0.3)] disabled:opacity-50"
-                  name="photo"
-                  type="file"
-                  accept="image/*"
-                  onChange={handleFileChange}
-                  disabled={loading || oauthLoading.google || oauthLoading.github}
-                />
-                {previewUrl && (
-                  <div className="mt-2 w-16 h-16 overflow-hidden border border-[rgba(229,228,226,0.3)]">
-                    <img
-                      src={previewUrl}
-                      alt="Preview"
-                      className="w-full h-full object-cover"
-                    />
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* LinkedIn Input */}
-            <div className="grid gap-2">
-              <label
-                htmlFor="linkedin"
-                className="uppercase text-xs tracking-[1px] text-[#E5E4E2]"
-              >
-                LinkedIn Profile
-              </label>
-              <input
-                id="linkedin"
-                className="w-full p-4 bg-black border border-[rgba(229,228,226,0.5)] focus:border-white text-white outline-none inset-shadow transition-brutal disabled:opacity-50"
-                name="linkedin"
-                type="url"
-                value={formData.linkedin}
-                onChange={handleChange}
-                placeholder="https://linkedin.com/in/username"
-                disabled={loading || oauthLoading.google || oauthLoading.github}
-              />
-            </div>
-
-            {/* GitHub Input */}
-            <div className="grid gap-2">
-              <label
-                htmlFor="github"
-                className="uppercase text-xs tracking-[1px] text-[#E5E4E2]"
-              >
-                GitHub Profile
-              </label>
-              <input
-                id="github"
-                className="w-full p-4 bg-black border border-[rgba(229,228,226,0.5)] focus:border-white text-white outline-none inset-shadow transition-brutal disabled:opacity-50"
-                name="github"
-                type="url"
-                value={formData.github}
-                onChange={handleChange}
-                placeholder="https://github.com/username"
-                disabled={loading || oauthLoading.google || oauthLoading.github}
-              />
-            </div>
-
-            {/* Twitter/X Input */}
-            <div className="grid gap-2 md:col-span-2">
-              <label
-                htmlFor="twitter"
-                className="uppercase text-xs tracking-[1px] text-[#E5E4E2]"
-              >
-                X (Twitter) Profile
-              </label>
-              <input
-                id="twitter"
-                className="w-full p-4 bg-black border border-[rgba(229,228,226,0.5)] focus:border-white text-white outline-none inset-shadow transition-brutal disabled:opacity-50"
-                name="twitter"
-                type="url"
-                value={formData.twitter}
-                onChange={handleChange}
-                placeholder="https://twitter.com/username"
-                disabled={loading || oauthLoading.google || oauthLoading.github}
-              />
-            </div>
-
-            {/* About Textarea */}
-            <div className="grid gap-2 md:col-span-2">
-              <label
-                htmlFor="about"
-                className="uppercase text-xs tracking-[1px] text-[#E5E4E2]"
-              >
-                About Me
-              </label>
-              <textarea
-                id="about"
-                className="w-full p-4 bg-black border border-[rgba(229,228,226,0.5)] focus:border-white text-white outline-none inset-shadow transition-brutal h-36 resize-vertical disabled:opacity-50"
-                name="about"
-                value={formData.about}
-                onChange={handleChange}
-                placeholder="Tell us about yourself..."
-                disabled={loading || oauthLoading.google || oauthLoading.github}
-              />
-            </div>
-          </div>
-
-          {/* Email Registration Notice */}
-          <div className="p-4 border border-[rgba(229,228,226,0.2)] bg-[rgba(229,228,226,0.05)] flex items-start gap-3">
-            <Info className="h-5 w-5 text-[rgba(229,228,226,0.7)] flex-shrink-0 mt-0.5" />
-            <div>
-              <p className="text-sm text-[rgba(229,228,226,0.8)] font-semibold mb-1">
-                Email Verification Required
-              </p>
-              <p className="text-xs text-[rgba(229,228,226,0.7)]">
-                You'll receive an OTP code to verify your email address before you can access your account.
-              </p>
-            </div>
-          </div>
-
-          {/* Submit Button */}
-          <Button
-            type="submit"
-            className="w-full py-6 font-['Space_Grotesk'] font-bold flex items-center justify-center gap-2"
-            disabled={loading || oauthLoading.google || oauthLoading.github}
-          >
-            {loading ? (
-              <>
-                <Loader2 className="h-4 w-4 animate-spin" />
-                CREATING ACCOUNT...
-              </>
-            ) : (
-              "CREATE ACCOUNT WITH EMAIL"
-            )}
-          </Button>
-        </form>
-
-        {/* Sign In Link */}
-        <div className="mt-8 text-center text-[rgba(229,228,226,0.8)]">
-          <span>Already have an account? </span>
-          <Link
-            to="/login"
-            className="text-white no-underline transition-brutal hover:text-[#E5E4E2]"
-          >
-            Sign in
-          </Link>
-        </div>
-      </div>
+      </Container>
     </div>
   );
 };
+
+const Divider = ({ label }) => (
+  <div className="relative" aria-hidden>
+    <div className="absolute inset-0 flex items-center">
+      <div className="w-full border-t border-ink-faint" />
+    </div>
+    <div className="relative flex justify-center text-xs">
+      <span className="px-3 bg-surface micro-text text-ink-subtle">
+        {label}
+      </span>
+    </div>
+  </div>
+);
 
 export default Register;

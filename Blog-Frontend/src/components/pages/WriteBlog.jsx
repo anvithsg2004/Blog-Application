@@ -1,5 +1,14 @@
-import React, { useState, useEffect, useContext } from "react";
-import { ArrowUp } from "lucide-react";
+import React, { useState, useEffect, useContext, useMemo } from "react";
+import { useNavigate } from "react-router-dom";
+import {
+  ArrowUp,
+  Eye,
+  Pencil,
+  Image as ImageIcon,
+  X as XIcon,
+  Sparkles,
+  Loader2,
+} from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import {
@@ -10,19 +19,34 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { AuthContext } from "../AuthContext";
-import { useNavigate } from "react-router-dom";
-import { marked } from "marked";
-import DOMPurify from "dompurify";
+import { Container } from "@/components/shared/Container";
+import { Section } from "@/components/shared/Section";
+import { Field, Input, Textarea } from "@/components/shared/Field";
+import { MarkdownView } from "@/components/shared/MarkdownView";
 import apiFetch from "../utils/api";
+
+const LANGUAGES = [
+  { value: "javascript", label: "JavaScript" },
+  { value: "typescript", label: "TypeScript" },
+  { value: "python", label: "Python" },
+  { value: "java", label: "Java" },
+  { value: "go", label: "Go" },
+  { value: "rust", label: "Rust" },
+  { value: "html", label: "HTML" },
+  { value: "css", label: "CSS" },
+  { value: "bash", label: "Bash" },
+  { value: "sql", label: "SQL" },
+];
 
 const WriteBlog = () => {
   const { isLoggedIn } = useContext(AuthContext);
   const { toast } = useToast();
   const navigate = useNavigate();
+
+  const [title, setTitle] = useState("");
   const [blogContent, setBlogContent] = useState("");
   const [codeContent, setCodeContent] = useState("");
   const [language, setLanguage] = useState("javascript");
-  const [title, setTitle] = useState("");
   const [selectedFile, setSelectedFile] = useState(null);
   const [previewUrl, setPreviewUrl] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -30,55 +54,58 @@ const WriteBlog = () => {
 
   useEffect(() => {
     if (!isLoggedIn) {
-      console.log("WriteBlog: User not logged in, redirecting to /login");
       localStorage.setItem("redirectAfterLogin", "/write-blog");
       navigate("/login");
     }
   }, [isLoggedIn, navigate]);
 
+  const wordCount = useMemo(
+    () =>
+      blogContent
+        .trim()
+        .split(/\s+/)
+        .filter(Boolean).length,
+    [blogContent]
+  );
+  const readMin = Math.max(1, Math.round(wordCount / 220));
+
   const handleFileChange = (e) => {
-    if (e.target.files && e.target.files[0]) {
+    if (e.target.files?.[0]) {
       const file = e.target.files[0];
       setSelectedFile(file);
-
-      const fileReader = new FileReader();
-      fileReader.onload = () => {
-        if (fileReader.result) {
-          setPreviewUrl(fileReader.result);
-        }
-      };
-      fileReader.readAsDataURL(file);
+      const reader = new FileReader();
+      reader.onload = () => setPreviewUrl(reader.result);
+      reader.readAsDataURL(file);
     }
   };
 
-  const scrollToTop = () => {
-    window.scrollTo({
-      top: 0,
-      behavior: "smooth",
-    });
+  const handleRemoveImage = () => {
+    setSelectedFile(null);
+    setPreviewUrl(null);
   };
+
+  const scrollToTop = () =>
+    window.scrollTo({ top: 0, behavior: "smooth" });
 
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    if (!title) {
+    if (!title.trim()) {
       toast({
         title: "Title is required",
-        description: "Please provide a title for your blog post.",
+        description: "Give your post a title.",
         variant: "destructive",
       });
       return;
     }
-
-    if (!blogContent) {
+    if (!blogContent.trim()) {
       toast({
         title: "Content is required",
-        description: "Please write some content for your blog post.",
+        description: "You haven't written anything yet.",
         variant: "destructive",
       });
       return;
     }
-
     if (selectedFile && selectedFile.size > 10 * 1024 * 1024) {
       toast({
         title: "Image too large",
@@ -89,65 +116,40 @@ const WriteBlog = () => {
     }
 
     setLoading(true);
-
     try {
       const formData = new FormData();
       formData.append("title", title);
       formData.append("content", blogContent);
-
       if (codeContent.trim()) {
-        if (!language) {
-          toast({
-            title: "Language required",
-            description: "Please select a language for your code snippet.",
-            variant: "destructive",
-          });
-          setLoading(false);
-          return;
-        }
         formData.append("language", language);
         formData.append("code", codeContent);
       }
-
-      if (selectedFile) {
-        formData.append("image", selectedFile);
-      }
+      if (selectedFile) formData.append("image", selectedFile);
 
       const response = await apiFetch("/api/blogs", {
         method: "POST",
         body: formData,
       });
-
-      const data = await response.json();
-      console.log("Blog created successfully:", data);
-
-      toast({
-        title: "Blog submitted successfully!",
-        description: "Your blog post has been created.",
-        variant: "success",
-      });
-
-      setTitle("");
-      setBlogContent("");
-      setCodeContent("");
-      setLanguage("javascript");
-      setSelectedFile(null);
-      setPreviewUrl(null);
-      setIsPreview(false);
-
-      navigate("/profile");
-    } catch (error) {
-      console.error("Failed to create blog:", error);
-      let errorMessage = "Failed to create blog post.";
-      if (error.message.includes("401")) {
-        errorMessage = "Unauthorized. Please log in again.";
-        navigate("/login");
-      } else if (error.message.includes("413")) {
-        errorMessage = "Image too large. Please upload a smaller file.";
+      if (!response.ok) {
+        if (response.status === 401) {
+          navigate("/login");
+          return;
+        }
+        throw new Error("Failed to publish");
       }
+
       toast({
-        title: "Error",
-        description: errorMessage,
+        title: "Published",
+        description: "Your blog is now live.",
+      });
+      navigate("/profile");
+    } catch (err) {
+      let msg = "Failed to publish blog.";
+      if (err.message?.includes("413"))
+        msg = "Image too large. Please use a smaller file.";
+      toast({
+        title: "Could not publish",
+        description: msg,
         variant: "destructive",
       });
     } finally {
@@ -155,107 +157,161 @@ const WriteBlog = () => {
     }
   };
 
-  // Parse and sanitize Markdown for preview
-  const markdownContent = marked(blogContent || "No content entered");
-  const sanitizedContent = DOMPurify.sanitize(markdownContent);
-
   return (
-    <div className="pt-20 min-h-screen bg-black">
-      <div className="max-w-7xl mx-auto py-16 px-4 sm:px-6 lg:px-8">
-        <div className="mb-12">
-          <h1 className="text-4xl md:text-5xl font-['Space_Grotesk'] font-bold tracking-[-1px] text-white">
-            CREATE NEW BLOG
-          </h1>
-          <p className="text-[rgba(229,228,226,0.8)] mt-4 max-w-4xl">
-            Share your knowledge, insights and expertise with our community.
-            Write about tech, design, or any topic you're passionate about. Use Markdown for formatting (e.g., ## for headings, ** for bold).
-          </p>
-        </div>
-
-        <form onSubmit={handleSubmit} className="max-w-4xl grid gap-8">
-          {/* Title Input */}
-          <div className="grid gap-2">
-            <label className="uppercase text-xs tracking-[1px] text-[#E5E4E2]">Blog Title</label>
-            <input
-              id="title"
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              className="p-4 border-4 border-white bg-black text-xl font-['Space_Grotesk'] focus:border-[#E5E4E2] outline-none transition-brutal"
-              placeholder="Enter a captivating title"
-              disabled={loading}
-            />
-          </div>
-
-          {/* Blog Content */}
-          <div className="grid gap-2">
-            <div className="flex justify-between items-center">
-              <label className="uppercase text-xs tracking-[1px] text-[#E5E4E2]">
-                Blog Content
-              </label>
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => setIsPreview(!isPreview)}
-                disabled={loading}
-              >
-                {isPreview ? "Edit" : "Preview"}
-              </Button>
+    <div className="bg-bg min-h-screen pt-20">
+      <Section>
+        <Container>
+          {/* Header */}
+          <div className="flex items-end justify-between gap-4 mb-10 flex-wrap">
+            <div>
+              <div className="micro-text text-accent mb-3 flex items-center gap-2">
+                <span className="inline-block w-6 h-px bg-accent" />
+                Compose
+              </div>
+              <h1 className="text-4xl md:text-5xl font-heading font-bold tracking-tight text-ink">
+                Write a new post<span className="text-accent">.</span>
+              </h1>
+              <p className="text-ink-muted mt-3 max-w-2xl">
+                Markdown supported. Use{" "}
+                <code className="px-1.5 py-0.5 bg-surface-2 text-accent text-xs">
+                  ##
+                </code>{" "}
+                for headings,{" "}
+                <code className="px-1.5 py-0.5 bg-surface-2 text-accent text-xs">
+                  **bold**
+                </code>{" "}
+                for emphasis.
+              </p>
             </div>
-            {isPreview ? (
-              <div
-                className="min-h-[300px] p-6 bg-black border border-[rgba(229,228,226,0.5)] text-lg leading-relaxed markdown-content"
-                dangerouslySetInnerHTML={{ __html: sanitizedContent }}
-              />
-            ) : (
-              <textarea
-                id="blogContent"
-                value={blogContent}
-                onChange={(e) => setBlogContent(e.target.value)}
-                className="min-h-[300px] p-6 bg-black border border-[rgba(229,228,226,0.5)] font-['Inter'] text-lg leading-relaxed outline-none inset-shadow transition-brutal"
-                placeholder="Start writing your blog post here... Use Markdown for formatting (e.g., ## for headings, ** for bold)"
+            <div className="flex items-center gap-4 text-xs text-ink-subtle">
+              <span>
+                <strong className="text-ink">{wordCount}</strong> words
+              </span>
+              <span>·</span>
+              <span>
+                <strong className="text-ink">{readMin}</strong> min read
+              </span>
+            </div>
+          </div>
+
+          <form onSubmit={handleSubmit} className="grid gap-8 max-w-4xl">
+            {/* Title */}
+            <Field id="title" label="Title" required>
+              <input
+                id="title"
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                placeholder="A captivating, sharp title"
                 disabled={loading}
+                className="w-full p-4 text-2xl font-heading font-bold bg-surface border border-ink-faint text-ink outline-none transition-colors focus:border-accent focus:bg-bg placeholder:text-ink-subtle disabled:opacity-50"
               />
-            )}
-          </div>
+            </Field>
 
-          {/* Language Selection */}
-          <div className="grid gap-2">
-            <label className="uppercase text-xs tracking-[1px] text-[#E5E4E2]">
-              Code Language (Optional)
-            </label>
-            <Select value={language} onValueChange={setLanguage} disabled={loading}>
-              <SelectTrigger className="p-4 bg-black border border-[rgba(229,228,226,0.5)] text-white outline-none transition-brutal focus:border-white">
-                <SelectValue placeholder="Select a language" />
-              </SelectTrigger>
-              <SelectContent className="bg-black border border-[rgba(229,228,226,0.5)] text-white">
-                <SelectItem value="javascript">JavaScript</SelectItem>
-                <SelectItem value="python">Python</SelectItem>
-                <SelectItem value="java">Java</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
+            {/* Content editor */}
+            <Field
+              id="blogContent"
+              label="Content"
+              required
+              labelAction={
+                <button
+                  type="button"
+                  onClick={() => setIsPreview((v) => !v)}
+                  disabled={loading}
+                  className="inline-flex items-center gap-1.5 micro-text text-accent hover:text-ink transition-colors"
+                >
+                  {isPreview ? (
+                    <>
+                      <Pencil size={12} />
+                      Edit
+                    </>
+                  ) : (
+                    <>
+                      <Eye size={12} />
+                      Preview
+                    </>
+                  )}
+                </button>
+              }
+            >
+              {isPreview ? (
+                <div className="min-h-[400px] p-6 bg-surface border border-ink-faint">
+                  {blogContent ? (
+                    <MarkdownView content={blogContent} />
+                  ) : (
+                    <p className="text-ink-subtle italic">
+                      Nothing to preview yet.
+                    </p>
+                  )}
+                </div>
+              ) : (
+                <Textarea
+                  id="blogContent"
+                  value={blogContent}
+                  onChange={(e) => setBlogContent(e.target.value)}
+                  placeholder="Start writing… markdown supported."
+                  disabled={loading}
+                  className="min-h-[400px] text-base leading-relaxed"
+                />
+              )}
+            </Field>
 
-          {/* Code Content */}
-          <div className="grid gap-2">
-            <label className="uppercase text-xs tracking-[1px] text-[#E5E4E2]">
-              Code Snippet (Optional)
-            </label>
-            <textarea
-              id="codeContent"
-              value={codeContent}
-              onChange={(e) => setCodeContent(e.target.value)}
-              className="min-h-[200px] p-6 bg-black border border-[rgba(229,228,226,0.5)] font-mono outline-none inset-shadow transition-brutal"
-              placeholder="// Add your code snippet here..."
-              disabled={loading}
-            />
-          </div>
+            {/* Code snippet */}
+            <div className="grid gap-5">
+              <h3 className="micro-text text-ink-subtle">Code (optional)</h3>
+              <div className="grid sm:grid-cols-[1fr,2fr] gap-4">
+                <Field id="codeLanguage" label="Language">
+                  <Select
+                    value={language}
+                    onValueChange={setLanguage}
+                    disabled={loading}
+                  >
+                    <SelectTrigger className="p-3 bg-surface border border-ink-faint text-ink h-auto">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent className="bg-surface border border-ink-faint text-ink">
+                      {LANGUAGES.map((l) => (
+                        <SelectItem key={l.value} value={l.value}>
+                          {l.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </Field>
+                <Field id="codeContent" label="Snippet">
+                  <Textarea
+                    id="codeContent"
+                    value={codeContent}
+                    onChange={(e) => setCodeContent(e.target.value)}
+                    placeholder="// Paste your code here…"
+                    disabled={loading}
+                    className="font-mono text-sm min-h-[180px]"
+                  />
+                </Field>
+              </div>
+            </div>
 
-          {/* File Upload */}
-          <div className="grid gap-4">
-            <label className="uppercase text-xs tracking-[1px] text-[#E5E4E2]">Featured Image</label>
-            <div className="flex gap-6 items-start">
-              <div className="flex-1">
-                <div className="border-2 border-dashed border-[rgba(229,228,226,0.5)] p-6 text-center cursor-pointer hover:border-[#E5E4E2] transition-brutal">
+            {/* Image */}
+            <Field
+              id="featured-image"
+              label="Featured image"
+              hint="Optional · PNG/JPG/GIF up to 10MB"
+            >
+              <div className="flex flex-col md:flex-row gap-4 items-stretch">
+                <label
+                  htmlFor="featured-image"
+                  className="flex-1 cursor-pointer border border-dashed border-ink-faint hover:border-accent p-8 flex flex-col items-center justify-center text-center transition-colors"
+                >
+                  <ImageIcon
+                    size={28}
+                    className="mb-3 text-ink-subtle"
+                    strokeWidth={1.5}
+                  />
+                  <span className="text-sm text-ink">
+                    {selectedFile ? selectedFile.name : "Click to upload"}
+                  </span>
+                  <span className="text-xs text-ink-subtle mt-1">
+                    or drag and drop
+                  </span>
                   <input
                     type="file"
                     id="featured-image"
@@ -264,100 +320,61 @@ const WriteBlog = () => {
                     className="hidden"
                     disabled={loading}
                   />
-                  <label
-                    htmlFor="featured-image"
-                    className="flex flex-col items-center justify-center py-4 cursor-pointer"
-                  >
-                    <svg
-                      className="h-12 w-12 text-[rgba(229,228,226,0.5)] mb-4"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="1"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
+                </label>
+                {previewUrl && (
+                  <div className="relative w-full md:w-1/3 border border-ink-faint">
+                    <img
+                      src={previewUrl}
+                      alt="Preview"
+                      className="w-full h-full aspect-[4/3] object-cover"
+                    />
+                    <button
+                      type="button"
+                      onClick={handleRemoveImage}
+                      className="absolute top-2 right-2 w-8 h-8 bg-bg border border-danger text-danger flex items-center justify-center hover:bg-danger hover:text-ink transition-colors"
+                      aria-label="Remove image"
                     >
-                      <path d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                    </svg>
-                    <span className="text-[#E5E4E2]">
-                      {selectedFile ? selectedFile.name : "Upload an image"}
-                    </span>
-                    <p className="text-[rgba(229,228,226,0.5)] text-sm mt-1">
-                      PNG, JPG or GIF up to 10MB
-                    </p>
-                  </label>
-                </div>
+                      <XIcon size={14} />
+                    </button>
+                  </div>
+                )}
               </div>
+            </Field>
 
-              {previewUrl && (
-                <div className="w-1/3 border border-[rgba(229,228,226,0.3)]">
-                  <img
-                    src={previewUrl}
-                    alt="Preview"
-                    className="w-full h-auto object-cover"
-                  />
-                </div>
-              )}
+            {/* Actions */}
+            <div className="flex items-center justify-between pt-6 border-t border-ink-faint">
+              <Button
+                type="button"
+                variant="ghost"
+                size="md"
+                onClick={scrollToTop}
+                disabled={loading}
+              >
+                <ArrowUp size={14} />
+                Back to top
+              </Button>
+              <Button
+                type="submit"
+                variant="accent"
+                size="lg"
+                disabled={loading}
+              >
+                {loading ? (
+                  <>
+                    <Loader2 size={16} className="animate-spin" />
+                    Publishing…
+                  </>
+                ) : (
+                  <>
+                    <Sparkles size={16} />
+                    Publish blog
+                  </>
+                )}
+              </Button>
             </div>
-          </div>
-
-          {/* Buttons */}
-          <div className="flex justify-between items-center pt-6">
-            <button
-              type="button"
-              className="bg-transparent border border-[rgba(229,228,226,0.5)] text-white py-3 px-6 cursor-pointer flex items-center transition-brutal hover:bg-[rgba(229,228,226,0.1)]"
-              onClick={scrollToTop}
-              disabled={loading}
-            >
-              <ArrowUp className="mr-2 h-4 w-4" />
-              Back to Top
-            </button>
-
-            <Button
-              type="submit"
-              className="py-6 px-8 font-['Space_Grotesk'] font-bold"
-              disabled={loading}
-            >
-              {loading ? "PUBLISHING..." : "PUBLISH BLOG"}
-            </Button>
-          </div>
-        </form>
-      </div>
-
-      <style jsx>{`
-        .markdown-content :where(h1, h2, h3, h4, h5, h6) {
-          font-family: "Space Grotesk", sans-serif;
-          font-weight: bold;
-          color: white;
-          margin: 1rem 0;
-        }
-        .markdown-content h1 { font-size: 2.25rem; }
-        .markdown-content h2 { font-size: 1.875rem; }
-        .markdown-content h3 { font-size: 1.5rem; }
-        .markdown-content p {
-          margin: 0.5rem 0;
-          color: rgba(255, 255, 255, 0.85);
-        }
-        .markdown-content ul,
-        .markdown-content ol {
-          margin: 0.5rem 0;
-          padding-left: 2rem;
-          color: rgba(255, 255, 255, 0.85);
-        }
-        .markdown-content strong {
-          font-weight: bold;
-          color: white;
-        }
-        .markdown-content em {
-          font-style: italic;
-        }
-        .markdown-content code {
-          background: rgba(229, 228, 226, 0.1);
-          padding: 0.2rem 0.4rem;
-          border-radius: 4px;
-          color: white;
-        }
-      `}</style>
+          </form>
+        </Container>
+      </Section>
     </div>
   );
 };

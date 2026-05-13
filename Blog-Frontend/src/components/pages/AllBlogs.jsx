@@ -1,158 +1,337 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo, useRef } from "react";
 import { Link } from "react-router-dom";
-import apiFetch from "../utils/api";
+import {
+  Search,
+  X,
+  BookOpen,
+  ChevronLeft,
+  ChevronRight,
+  Sparkles,
+  Grid3x3,
+  List,
+  RefreshCw,
+} from "lucide-react";
+import { Container } from "@/components/shared/Container";
+import { Section } from "@/components/shared/Section";
+import { PageHeader } from "@/components/shared/PageHeader";
+import { BlogCardSkeleton } from "@/components/shared/BlogCardSkeleton";
+import { EmptyState } from "@/components/shared/EmptyState";
+import { StaleBanner } from "@/components/shared/StaleBanner";
+import { Button } from "@/components/ui/button";
+import BlogCard from "@/components/BlogCard";
+import { useBlogs } from "@/hooks/useBlogs";
+import { useSearchHotkey } from "@/hooks/useSearchHotkey";
+import { cn } from "@/lib/utils";
+
+const PAGE_SIZE = 6;
+
+const formatBlog = (blog) => ({
+  id: blog.id,
+  title: blog.title,
+  excerpt:
+    blog.content && blog.content.length > 240
+      ? blog.content.substring(0, 240).trim() + "…"
+      : blog.content || "",
+  imageUrl: blog.image ? `data:image/jpeg;base64,${blog.image}` : null,
+  authorName:
+    blog.author?.name ||
+    (blog.authorEmail ? blog.authorEmail.split("@")[0] : "Unknown"),
+  authorEmail: blog.authorEmail,
+  date: blog.createdAt
+    ? new Date(blog.createdAt)
+        .toLocaleDateString("en-US", {
+          month: "short",
+          day: "numeric",
+          year: "numeric",
+        })
+        .toUpperCase()
+    : "",
+});
 
 const AllBlogs = () => {
-    const [blogs, setBlogs] = useState([]);
-    const [filteredBlogs, setFilteredBlogs] = useState([]);
-    const [searchQuery, setSearchQuery] = useState("");
-    const [loading, setLoading] = useState(true);
-    const [currentPage, setCurrentPage] = useState(1);
-    const blogsPerPage = 6;
+  const [searchQuery, setSearchQuery] = useState("");
+  const [currentPage, setCurrentPage] = useState(1);
+  const [view, setView] = useState("grid"); // grid | list
+  const searchInputRef = useRef(null);
+  const { isMac } = useSearchHotkey(searchInputRef);
 
-    useEffect(() => {
-        const fetchBlogs = async () => {
-            try {
-                const response = await apiFetch("/api/blogs", {
-                    method: "GET",
-                });
-                if (!response.ok) {
-                    throw new Error("Failed to fetch blogs");
-                }
-                const data = await response.json();
-                const formattedBlogs = data.map(blog => ({
-                    id: blog.id,
-                    title: blog.title,
-                    excerpt: blog.content.substring(0, 150) + "...",
-                    imageUrl: blog.image ? `data:image/jpeg;base64,${blog.image}` : null,
-                    authorName: blog.authorEmail, // Will be updated later
-                    date: new Date(blog.createdAt).toLocaleDateString('en-US', {
-                        month: 'short',
-                        day: 'numeric',
-                        year: 'numeric'
-                    }).toUpperCase(),
-                }));
-                setBlogs(formattedBlogs);
-                setFilteredBlogs(formattedBlogs);
-                setLoading(false);
-            } catch (error) {
-                console.error("Error fetching blogs:", error);
-                setLoading(false);
-            }
-        };
+  const {
+    blogs: rawBlogs,
+    loading,
+    error,
+    isStale,
+    savedAt,
+    refetch,
+    hasCachedFallback,
+  } = useBlogs();
 
-        fetchBlogs();
-    }, []);
+  const blogs = useMemo(() => rawBlogs.map(formatBlog), [rawBlogs]);
 
-    useEffect(() => {
-        if (searchQuery.trim() === "") {
-            setFilteredBlogs(blogs);
-        } else {
-            const query = searchQuery.toLowerCase();
-            setFilteredBlogs(
-                blogs.filter(
-                    (blog) =>
-                        blog.title.toLowerCase().includes(query) ||
-                        blog.authorName.toLowerCase().includes(query)
-                )
-            );
-        }
-        setCurrentPage(1); // Reset to first page on search
-    }, [searchQuery, blogs]);
-
-    // Calculate paginated blogs
-    const indexOfLastBlog = currentPage * blogsPerPage;
-    const indexOfFirstBlog = indexOfLastBlog - blogsPerPage;
-    const currentBlogs = filteredBlogs.slice(indexOfFirstBlog, indexOfLastBlog);
-    const totalPages = Math.ceil(filteredBlogs.length / blogsPerPage);
-
-    const handlePageChange = (pageNumber) => {
-        setCurrentPage(pageNumber);
-        window.scrollTo({ top: 0, behavior: 'smooth' }); // Scroll to top on page change
-    };
-
-    if (loading) {
-        return (
-            <div className="pt-20 min-h-screen bg-black flex items-center justify-center">
-                <div className="w-16 h-16 border-4 border-t-white border-r-white/30 border-b-white/10 border-l-white/60 rounded-full animate-spin"></div>
-            </div>
-        );
-    }
-
-    return (
-        <div className="pt-20 min-h-screen bg-black">
-            <div className="max-w-7xl mx-auto px-4 py-16">
-                <h1 className="text-4xl md:text-5xl font-['Space_Grotesk'] font-bold tracking-[-1px] text-white mb-12">
-                    ALL BLOGS
-                </h1>
-                <div className="mb-12">
-                    <input
-                        type="text"
-                        placeholder="SEARCH BLOGS BY TITLE OR AUTHOR..."
-                        value={searchQuery}
-                        onChange={(e) => setSearchQuery(e.target.value)}
-                        className="w-full max-w-md p-4 bg-black border border-[rgba(229,228,226,0.5)] text-white outline-none inset-shadow transition-brutal focus:border-white uppercase text-xs tracking-[1px]"
-                    />
-                </div>
-                <div className="grid md:grid-cols-2 gap-12">
-                    {currentBlogs.map((blog) => (
-                        <Link key={blog.id} to={`/blog/${blog.id}`} className="block transition-brutal">
-                            <div className="border border-[rgba(229,228,226,0.3)] overflow-hidden">
-                                <div className="aspect-[16/9] overflow-hidden">
-                                    <img
-                                        src={blog.imageUrl || "https://images.pexels.com/photos/3861969/pexels-photo-3861969.jpeg"}
-                                        alt={blog.title || "Blog image"}
-                                        className="w-full h-full object-cover opacity-80 transition-all duration-700 ease-[cubic-bezier(0.215,0.61,0.355,1)] hover:opacity-100 hover:scale-105"
-                                        onError={(e) => {
-                                            e.target.src = "https://images.pexels.com/photos/3861969/pexels-photo-3861969.jpeg";
-                                            console.error(`Failed to load blog image for blog ID: ${blog.id}`);
-                                        }}
-                                    />
-                                </div>
-                                <div className="p-6 bg-black">
-                                    <h2 className="text-xl md:text-2xl font-['Space_Grotesk'] font-bold tracking-[-1px] text-white">
-                                        {blog.title || "Untitled"}
-                                    </h2>
-                                </div>
-                            </div>
-                        </Link>
-                    ))}
-                </div>
-                {totalPages > 1 && (
-                    <div className="mt-12 flex justify-center items-center gap-4">
-                        <button
-                            onClick={() => handlePageChange(currentPage - 1)}
-                            disabled={currentPage === 1}
-                            className="px-4 py-2 bg-black border border-[rgba(229,228,226,0.5)] text-white uppercase text-xs tracking-[1px] transition-brutal hover:bg-[rgba(229,228,226,0.1)] disabled:opacity-50 disabled:cursor-not-allowed"
-                        >
-                            PREVIOUS
-                        </button>
-                        <div className="flex gap-2">
-                            {Array.from({ length: totalPages }, (_, index) => (
-                                <button
-                                    key={index + 1}
-                                    onClick={() => handlePageChange(index + 1)}
-                                    className={`px-4 py-2 border border-[rgba(229,228,226,0.5)] text-white uppercase text-xs tracking-[1px] transition-brutal ${currentPage === index + 1
-                                        ? "bg-white text-black"
-                                        : "bg-black hover:bg-[rgba(229,228,226,0.1)]"
-                                        }`}
-                                >
-                                    {index + 1}
-                                </button>
-                            ))}
-                        </div>
-                        <button
-                            onClick={() => handlePageChange(currentPage + 1)}
-                            disabled={currentPage === totalPages}
-                            className="px-4 py-2 bg-black border border-[rgba(229,228,226,0.5)] text-white uppercase text-xs tracking-[1px] transition-brutal hover:bg-[rgba(229,228,226,0.1)] disabled:opacity-50 disabled:cursor-not-allowed"
-                        >
-                            NEXT
-                        </button>
-                    </div>
-                )}
-            </div>
-        </div>
+  const filtered = useMemo(() => {
+    const q = searchQuery.toLowerCase().trim();
+    if (!q) return blogs;
+    return blogs.filter(
+      (b) =>
+        b.title.toLowerCase().includes(q) ||
+        b.authorName.toLowerCase().includes(q) ||
+        b.excerpt.toLowerCase().includes(q)
     );
+  }, [blogs, searchQuery]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchQuery]);
+
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const safePage = Math.min(currentPage, totalPages);
+  const start = (safePage - 1) * PAGE_SIZE;
+  const pageBlogs = filtered.slice(start, start + PAGE_SIZE);
+
+  const handlePageChange = (n) => {
+    setCurrentPage(n);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
+  const showStale = isStale && hasCachedFallback;
+  const showHardError = !loading && error && !hasCachedFallback;
+  const showLoadingState = loading && blogs.length === 0;
+
+  return (
+    <div className="bg-bg min-h-screen pt-20">
+      <Section>
+        <Container>
+          <PageHeader
+            eyebrow="Archive"
+            title={
+              <>
+                Every post on AIDEN
+                <span className="text-accent">.</span>
+              </>
+            }
+            description={`${blogs.length} ${blogs.length === 1 ? "story" : "stories"} written, sharpened, and shipped.`}
+          />
+
+          {/* Stale banner */}
+          {showStale && (
+            <StaleBanner
+              savedAt={savedAt}
+              onRetry={refetch}
+              retrying={loading}
+              className="mb-10"
+            />
+          )}
+
+          {/* Toolbar */}
+          {!showHardError && (
+            <div className="flex flex-col md:flex-row gap-4 items-stretch md:items-center justify-between mb-10">
+              <div className="relative flex-1 max-w-xl">
+                <Search
+                  size={18}
+                  className="absolute inset-y-0 left-4 my-auto text-ink-subtle"
+                />
+                <input
+                  ref={searchInputRef}
+                  type="text"
+                  placeholder="Search by title, author, or content…"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="w-full pl-12 pr-24 py-3.5 bg-surface border border-ink-faint text-ink placeholder:text-ink-subtle outline-none transition-colors focus:border-accent focus:bg-bg"
+                  aria-label="Search blogs"
+                />
+                {searchQuery ? (
+                  <button
+                    onClick={() => setSearchQuery("")}
+                    className="absolute inset-y-0 right-4 my-auto text-ink-subtle hover:text-ink"
+                    aria-label="Clear search"
+                  >
+                    <X size={16} />
+                  </button>
+                ) : (
+                  <kbd className="hidden md:flex absolute inset-y-0 right-3 my-auto h-7 items-center gap-1 px-2 border border-ink-faint bg-bg text-[10px] uppercase tracking-[0.12em] text-ink-subtle font-mono pointer-events-none">
+                    <span>{isMac ? "⌘" : "Ctrl"}</span>
+                    <span>K</span>
+                  </kbd>
+                )}
+              </div>
+
+              <div className="flex items-center gap-3">
+                <div className="micro-text text-ink-subtle">
+                  {filtered.length}{" "}
+                  {filtered.length === 1 ? "result" : "results"}
+                </div>
+                <div className="flex border border-ink-faint">
+                  <ViewToggle
+                    active={view === "grid"}
+                    onClick={() => setView("grid")}
+                    icon={<Grid3x3 size={14} />}
+                    label="Grid"
+                  />
+                  <ViewToggle
+                    active={view === "list"}
+                    onClick={() => setView("list")}
+                    icon={<List size={14} />}
+                    label="List"
+                  />
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Loading */}
+          {showLoadingState && (
+            <div
+              className={cn(
+                view === "grid"
+                  ? "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6"
+                  : "grid gap-8"
+              )}
+            >
+              {Array.from({ length: 6 }).map((_, i) => (
+                <BlogCardSkeleton key={i} />
+              ))}
+            </div>
+          )}
+
+          {/* Hard error (nothing cached) */}
+          {showHardError && (
+            <EmptyState
+              icon={X}
+              variant="danger"
+              title="Couldn't load posts"
+              description="The blog service is unavailable. Please try again in a moment."
+              action={
+                <Button
+                  onClick={refetch}
+                  variant="accent"
+                  size="lg"
+                  disabled={loading}
+                >
+                  <RefreshCw size={16} />
+                  Try again
+                </Button>
+              }
+            />
+          )}
+
+          {/* Empty */}
+          {!showLoadingState && !showHardError && filtered.length === 0 && (
+            <EmptyState
+              icon={searchQuery ? Search : BookOpen}
+              title={
+                searchQuery
+                  ? `No matches for "${searchQuery}"`
+                  : "No posts yet"
+              }
+              description={
+                searchQuery
+                  ? "Try a different keyword or clear the search."
+                  : "Once authors start publishing, you'll see their work here."
+              }
+              action={
+                !searchQuery && (
+                  <Button asChild variant="accent" size="lg">
+                    <Link to="/write-blog">
+                      <Sparkles size={16} />
+                      Write the first one
+                    </Link>
+                  </Button>
+                )
+              }
+            />
+          )}
+
+          {/* Content */}
+          {!showLoadingState && !showHardError && filtered.length > 0 && (
+            <>
+              {view === "grid" ? (
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 md:gap-8">
+                  {pageBlogs.map((blog) => (
+                    <BlogCard key={blog.id} {...blog} variant="compact" />
+                  ))}
+                </div>
+              ) : (
+                <div className="grid gap-8">
+                  {pageBlogs.map((blog) => (
+                    <BlogCard key={blog.id} {...blog} />
+                  ))}
+                </div>
+              )}
+
+              {/* Pagination */}
+              {totalPages > 1 && (
+                <Pagination
+                  current={safePage}
+                  total={totalPages}
+                  onChange={handlePageChange}
+                />
+              )}
+            </>
+          )}
+        </Container>
+      </Section>
+    </div>
+  );
+};
+
+const ViewToggle = ({ active, onClick, icon, label }) => (
+  <button
+    onClick={onClick}
+    className={cn(
+      "px-3 py-2 flex items-center gap-2 micro-text transition-colors",
+      active
+        ? "bg-accent text-accent-ink"
+        : "bg-transparent text-ink-muted hover:text-ink"
+    )}
+    aria-label={`${label} view`}
+    aria-pressed={active}
+  >
+    {icon}
+    <span className="hidden sm:inline">{label}</span>
+  </button>
+);
+
+const Pagination = ({ current, total, onChange }) => {
+  const pages = Array.from({ length: total }, (_, i) => i + 1);
+  return (
+    <nav
+      className="mt-14 flex flex-wrap items-center justify-center gap-2"
+      aria-label="Pagination"
+    >
+      <button
+        onClick={() => onChange(current - 1)}
+        disabled={current === 1}
+        className="flex items-center gap-1 px-3 py-2 border border-ink-faint micro-text text-ink-muted hover:text-ink hover:border-ink disabled:opacity-30 disabled:pointer-events-none transition-colors"
+      >
+        <ChevronLeft size={14} />
+        Prev
+      </button>
+      <div className="flex gap-1.5">
+        {pages.map((p) => (
+          <button
+            key={p}
+            onClick={() => onChange(p)}
+            aria-current={p === current ? "page" : undefined}
+            className={cn(
+              "w-10 h-10 micro-text border transition-colors",
+              p === current
+                ? "bg-accent text-accent-ink border-accent"
+                : "bg-transparent text-ink-muted border-ink-faint hover:text-ink hover:border-ink"
+            )}
+          >
+            {p}
+          </button>
+        ))}
+      </div>
+      <button
+        onClick={() => onChange(current + 1)}
+        disabled={current === total}
+        className="flex items-center gap-1 px-3 py-2 border border-ink-faint micro-text text-ink-muted hover:text-ink hover:border-ink disabled:opacity-30 disabled:pointer-events-none transition-colors"
+      >
+        Next
+        <ChevronRight size={14} />
+      </button>
+    </nav>
+  );
 };
 
 export default AllBlogs;

@@ -1,306 +1,384 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { ArrowLeft, Save } from "lucide-react";
+import {
+  ArrowLeft,
+  Save,
+  Eye,
+  Pencil,
+  Image as ImageIcon,
+  X as XIcon,
+  Loader2,
+} from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Container } from "@/components/shared/Container";
+import { Section } from "@/components/shared/Section";
+import { Field, Textarea } from "@/components/shared/Field";
+import { MarkdownView } from "@/components/shared/MarkdownView";
+import { PageSpinner } from "@/components/shared/Spinner";
 import apiFetch from "../utils/api";
 
+const LANGUAGES = [
+  { value: "javascript", label: "JavaScript" },
+  { value: "typescript", label: "TypeScript" },
+  { value: "python", label: "Python" },
+  { value: "java", label: "Java" },
+  { value: "go", label: "Go" },
+  { value: "rust", label: "Rust" },
+  { value: "html", label: "HTML" },
+  { value: "css", label: "CSS" },
+  { value: "bash", label: "Bash" },
+  { value: "sql", label: "SQL" },
+];
+
 const EditBlog = () => {
-    const { id } = useParams();
-    const navigate = useNavigate();
-    const { toast } = useToast();
+  const { id } = useParams();
+  const navigate = useNavigate();
+  const { toast } = useToast();
 
-    const [isLoading, setIsLoading] = useState(true);
-    const [blogContent, setBlogContent] = useState("");
-    const [codeContent, setCodeContent] = useState("");
-    const [codeLanguage, setCodeLanguage] = useState("");
-    const [title, setTitle] = useState("");
-    const [currentImage, setCurrentImage] = useState(null);
-    const [selectedFile, setSelectedFile] = useState(null);
-    const [previewUrl, setPreviewUrl] = useState(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [title, setTitle] = useState("");
+  const [blogContent, setBlogContent] = useState("");
+  const [codeContent, setCodeContent] = useState("");
+  const [codeLanguage, setCodeLanguage] = useState("javascript");
+  const [selectedFile, setSelectedFile] = useState(null);
+  const [previewUrl, setPreviewUrl] = useState(null);
+  const [isPreview, setIsPreview] = useState(false);
 
-    // Fetch blog data
-    useEffect(() => {
-        const fetchBlog = async () => {
-            setIsLoading(true);
-            try {
-                const response = await apiFetch(`/api/blogs/${id}`);
-                if (!response.ok) {
-                    if (response.status === 401) {
-                        localStorage.setItem("redirectAfterLogin", `/blogs/edit/${id}`);
-                        navigate("/login");
-                        return;
-                    }
-                    throw new Error("Failed to fetch blog");
-                }
-                const data = await response.json();
-                setTitle(data.title);
-                setBlogContent(data.content);
-                setCodeContent(data.codeSnippet || "");
-                setCodeLanguage(data.codeLanguage || "");
-                setCurrentImage(data.image ? `data:image/jpeg;base64,${data.image}` : null);
-                setPreviewUrl(data.image ? `data:image/jpeg;base64,${data.image}` : null);
-            } catch (error) {
-                console.error("Failed to fetch blog:", error);
-                toast({
-                    title: "Error fetching blog",
-                    description: "Could not load the blog post. Please try again.",
-                    variant: "destructive",
-                });
-            } finally {
-                setIsLoading(false);
-            }
-        };
-
-        fetchBlog();
-    }, [id, navigate, toast]);
-
-    const handleFileChange = (e) => {
-        if (e.target.files && e.target.files[0]) {
-            const file = e.target.files[0];
-            setSelectedFile(file);
-
-            // Create a preview URL
-            const fileReader = new FileReader();
-            fileReader.onload = () => {
-                if (fileReader.result) {
-                    setPreviewUrl(fileReader.result);
-                }
-            };
-            fileReader.readAsDataURL(file);
-        }
-    };
-
-    const handleCancel = () => {
-        navigate(-1);
-    };
-
-    const handleSubmit = async (e) => {
-        e.preventDefault();
-
-        // Validate form
-        if (!title) {
-            toast({
-                title: "Title is required",
-                description: "Please provide a title for your blog post.",
-                variant: "destructive",
-            });
+  useEffect(() => {
+    let active = true;
+    (async () => {
+      setIsLoading(true);
+      try {
+        const response = await apiFetch(`/api/blogs/${id}`);
+        if (!response.ok) {
+          if (response.status === 401) {
+            localStorage.setItem("redirectAfterLogin", `/edit-blog/${id}`);
+            navigate("/login");
             return;
+          }
+          throw new Error("Failed to fetch blog");
         }
-
-        if (!blogContent) {
-            toast({
-                title: "Content is required",
-                description: "Please write some content for your blog post.",
-                variant: "destructive",
-            });
-            return;
-        }
-
-        setIsLoading(true);
-
-        try {
-            const formData = new FormData();
-            formData.append("id", id);
-            formData.append("title", title);
-            formData.append("content", blogContent);
-            if (codeContent) {
-                formData.append("code", codeContent);
-                formData.append("language", codeLanguage || "javascript");
-            }
-            if (selectedFile) {
-                formData.append("image", selectedFile);
-            }
-
-            const response = await apiFetch("/api/blogs", {
-                method: "PUT",
-                body: formData,
-            });
-
-            if (!response.ok) {
-                if (response.status === 401) {
-                    localStorage.setItem("redirectAfterLogin", `/blogs/edit/${id}`);
-                    navigate("/login");
-                    return;
-                }
-                throw new Error("Failed to update blog");
-            }
-
-            toast({
-                title: "Blog updated successfully!",
-                description: "Your changes have been saved.",
-            });
-
-            navigate("/profile");
-        } catch (error) {
-            console.error("Error updating blog:", error);
-            toast({
-                title: "Error updating blog",
-                description: "Could not save your changes. Please try again.",
-                variant: "destructive",
-            });
-        } finally {
-            setIsLoading(false);
-        }
+        const data = await response.json();
+        if (!active) return;
+        setTitle(data.title || "");
+        setBlogContent(data.content || "");
+        setCodeContent(data.codeSnippet || "");
+        setCodeLanguage(data.codeLanguage || "javascript");
+        const img = data.image ? `data:image/jpeg;base64,${data.image}` : null;
+        setPreviewUrl(img);
+      } catch (err) {
+        toast({
+          title: "Could not load blog",
+          description: "Please try again later.",
+          variant: "destructive",
+        });
+      } finally {
+        if (active) setIsLoading(false);
+      }
+    })();
+    return () => {
+      active = false;
     };
+  }, [id, navigate, toast]);
 
-    if (isLoading) {
-        return (
-            <div className="pt-20 min-h-screen bg-black flex items-center justify-center">
-                <div className="w-24 h-24 border-4 border-t-white border-r-white/30 border-b-white/10 border-l-white/60 rounded-full animate-spin"></div>
-            </div>
-        );
+  const wordCount = useMemo(
+    () => blogContent.trim().split(/\s+/).filter(Boolean).length,
+    [blogContent]
+  );
+  const readMin = Math.max(1, Math.round(wordCount / 220));
+
+  const handleFileChange = (e) => {
+    if (e.target.files?.[0]) {
+      const file = e.target.files[0];
+      setSelectedFile(file);
+      const reader = new FileReader();
+      reader.onload = () => setPreviewUrl(reader.result);
+      reader.readAsDataURL(file);
     }
+  };
 
-    return (
-        <div className="pt-20 min-h-screen bg-black">
-            <div className="max-w-7xl mx-auto py-16 px-6">
-                <div className="mb-12 flex items-center">
-                    <button
-                        onClick={handleCancel}
-                        className="mr-4 p-2 bg-transparent border border-[rgba(229,228,226,0.5)] text-white hover:bg-[rgba(229,228,226,0.1)] transition-brutal flex items-center justify-center"
-                    >
-                        <ArrowLeft size={20} />
-                    </button>
-                    <h1 className="text-4xl md:text-5xl font-['Space_Grotesk'] font-bold tracking-[-1px] text-white">
-                        EDIT BLOG
-                    </h1>
+  const handleRemoveImage = () => {
+    setSelectedFile(null);
+    setPreviewUrl(null);
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (!title.trim()) {
+      toast({
+        title: "Title required",
+        variant: "destructive",
+      });
+      return;
+    }
+    if (!blogContent.trim()) {
+      toast({
+        title: "Content required",
+        variant: "destructive",
+      });
+      return;
+    }
+    setSaving(true);
+    try {
+      const formData = new FormData();
+      formData.append("id", id);
+      formData.append("title", title);
+      formData.append("content", blogContent);
+      if (codeContent.trim()) {
+        formData.append("code", codeContent);
+        formData.append("language", codeLanguage);
+      }
+      if (selectedFile) formData.append("image", selectedFile);
+
+      const response = await apiFetch("/api/blogs", {
+        method: "PUT",
+        body: formData,
+      });
+      if (!response.ok) {
+        if (response.status === 401) {
+          navigate("/login");
+          return;
+        }
+        throw new Error("Failed to update");
+      }
+      toast({ title: "Saved", description: "Your changes are live." });
+      navigate("/profile");
+    } catch {
+      toast({
+        title: "Could not save",
+        description: "Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  if (isLoading) return <PageSpinner label="Loading post" />;
+
+  return (
+    <div className="bg-bg min-h-screen pt-20">
+      <Section>
+        <Container>
+          {/* Header */}
+          <div className="flex items-end justify-between gap-4 mb-10 flex-wrap">
+            <div className="flex items-center gap-4">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => navigate(-1)}
+              >
+                <ArrowLeft size={14} />
+                Back
+              </Button>
+              <div>
+                <div className="micro-text text-accent flex items-center gap-2 mb-2">
+                  <span className="inline-block w-6 h-px bg-accent" />
+                  Editing
                 </div>
-
-                <form onSubmit={handleSubmit} className="max-w-4xl grid gap-8">
-                    {/* Title Input */}
-                    <div className="grid gap-2">
-                        <label className="uppercase text-xs tracking-[1px] text-[#E5E4E2]">Blog Title</label>
-                        <input
-                            id="title"
-                            value={title}
-                            onChange={(e) => setTitle(e.target.value)}
-                            className="p-4 border-4 border-white bg-black text-xl font-['Space_Grotesk'] focus:border-[#E5E4E2] outline-none transition-brutal"
-                            placeholder="Enter a captivating title"
-                        />
-                    </div>
-
-                    {/* Blog Content */}
-                    <div className="grid gap-2">
-                        <label className="uppercase text-xs tracking-[1px] text-[#E5E4E2]">Blog Content</label>
-                        <textarea
-                            id="blogContent"
-                            value={blogContent}
-                            onChange={(e) => setBlogContent(e.target.value)}
-                            className="min-h-[300px] p-6 bg-black border border-[rgba(229,228,226,0.5)] font-['Inter'] text-lg leading-relaxed outline-none inset-shadow transition-brutal"
-                            placeholder="Start writing your blog post here..."
-                        />
-                    </div>
-
-                    {/* Code Language */}
-                    <div className="grid gap-2">
-                        <label className="uppercase text-xs tracking-[1px] text-[#E5E4E2]">Code Language (Optional)</label>
-                        <input
-                            id="codeLanguage"
-                            value={codeLanguage}
-                            onChange={(e) => setCodeLanguage(e.target.value)}
-                            className="p-4 border-4 border-white bg-black text-xl font-['Space_Grotesk'] focus:border-[#E5E4E2] outline-none transition-brutal"
-                            placeholder="e.g., javascript, python"
-                        />
-                    </div>
-
-                    {/* Code Content */}
-                    <div className="grid gap-2">
-                        <label className="uppercase text-xs tracking-[1px] text-[#E5E4E2]">Code Snippet (Optional)</label>
-                        <textarea
-                            id="codeContent"
-                            value={codeContent}
-                            onChange={(e) => setCodeContent(e.target.value)}
-                            className="min-h-[200px] p-6 bg-black border border-[rgba(229,228,226,0.5)] font-mono outline-none inset-shadow transition-brutal"
-                            placeholder="// Add your code snippet here..."
-                        />
-                    </div>
-
-                    {/* File Upload */}
-                    <div className="grid gap-4">
-                        <label className="uppercase text-xs tracking-[1px] text-[#E5E4E2]">Featured Image</label>
-                        <div className="flex flex-col md:flex-row gap-6 items-start">
-                            <div className="flex-1">
-                                <div className="border-2 border-dashed border-[rgba(229,228,226,0.5)] p-6 text-center cursor-pointer hover:border-[#E5E4E2] transition-brutal">
-                                    <input
-                                        type="file"
-                                        id="featured-image"
-                                        accept="image/*"
-                                        onChange={handleFileChange}
-                                        className="hidden"
-                                    />
-                                    <label
-                                        htmlFor="featured-image"
-                                        className="flex flex-col items-center justify-center py-4 cursor-pointer"
-                                    >
-                                        <svg
-                                            className="h-12 w-12 text-[rgba(229,228,226,0.5)] mb-4"
-                                            viewBox="0 0 24 24"
-                                            fill="none"
-                                            stroke="currentColor"
-                                            strokeWidth="1"
-                                            strokeLinecap="round"
-                                            strokeLinejoin="round"
-                                        >
-                                            <path d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                                        </svg>
-                                        <span className="text-[#E5E4E2]">
-                                            {selectedFile ? selectedFile.name : "Upload a new image"}
-                                        </span>
-                                        <p className="text-[rgba(229,228,226,0.5)] text-sm mt-1">
-                                            PNG, JPG or GIF up to 10MB
-                                        </p>
-                                    </label>
-                                </div>
-                            </div>
-
-                            {previewUrl && (
-                                <div className="w-full md:w-1/3 border border-[rgba(229,228,226,0.3)]">
-                                    <img
-                                        src={previewUrl}
-                                        alt="Preview"
-                                        className="w-full h-auto object-cover"
-                                    />
-                                    <div className="p-2 text-center text-[rgba(229,228,226,0.5)] text-xs">
-                                        {selectedFile ? "New image" : "Current image"}
-                                    </div>
-                                </div>
-                            )}
-                        </div>
-                    </div>
-
-                    {/* Buttons */}
-                    <div className="flex justify-between items-center pt-6">
-                        <button
-                            type="button"
-                            onClick={handleCancel}
-                            className="bg-transparent border border-[rgba(229,228,226,0.5)] text-white py-3 px-6 cursor-pointer flex items-center transition-brutal hover:bg-[rgba(229,228,226,0.1)]"
-                        >
-                            CANCEL
-                        </button>
-
-                        <Button
-                            type="submit"
-                            className="py-6 px-8 font-['Space_Grotesk'] font-bold flex items-center"
-                            disabled={isLoading}
-                        >
-                            {isLoading ? (
-                                <>
-                                    <div className="mr-2 h-4 w-4 border-2 border-t-transparent border-white rounded-full animate-spin"></div>
-                                    UPDATING...
-                                </>
-                            ) : (
-                                <>
-                                    <Save className="mr-2 h-4 w-4" />
-                                    SAVE CHANGES
-                                </>
-                            )}
-                        </Button>
-                    </div>
-                </form>
+                <h1 className="text-4xl md:text-5xl font-heading font-bold tracking-tight text-ink">
+                  Edit post<span className="text-accent">.</span>
+                </h1>
+              </div>
             </div>
-        </div>
-    );
+            <div className="flex items-center gap-4 text-xs text-ink-subtle">
+              <span>
+                <strong className="text-ink">{wordCount}</strong> words
+              </span>
+              <span>·</span>
+              <span>
+                <strong className="text-ink">{readMin}</strong> min read
+              </span>
+            </div>
+          </div>
+
+          <form onSubmit={handleSubmit} className="grid gap-8 max-w-4xl">
+            <Field id="title" label="Title" required>
+              <input
+                id="title"
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                placeholder="A captivating, sharp title"
+                disabled={saving}
+                className="w-full p-4 text-2xl font-heading font-bold bg-surface border border-ink-faint text-ink outline-none transition-colors focus:border-accent focus:bg-bg placeholder:text-ink-subtle disabled:opacity-50"
+              />
+            </Field>
+
+            <Field
+              id="blogContent"
+              label="Content"
+              required
+              labelAction={
+                <button
+                  type="button"
+                  onClick={() => setIsPreview((v) => !v)}
+                  disabled={saving}
+                  className="inline-flex items-center gap-1.5 micro-text text-accent hover:text-ink transition-colors"
+                >
+                  {isPreview ? (
+                    <>
+                      <Pencil size={12} />
+                      Edit
+                    </>
+                  ) : (
+                    <>
+                      <Eye size={12} />
+                      Preview
+                    </>
+                  )}
+                </button>
+              }
+            >
+              {isPreview ? (
+                <div className="min-h-[400px] p-6 bg-surface border border-ink-faint">
+                  {blogContent ? (
+                    <MarkdownView content={blogContent} />
+                  ) : (
+                    <p className="text-ink-subtle italic">
+                      Nothing to preview yet.
+                    </p>
+                  )}
+                </div>
+              ) : (
+                <Textarea
+                  id="blogContent"
+                  value={blogContent}
+                  onChange={(e) => setBlogContent(e.target.value)}
+                  placeholder="Edit your content…"
+                  disabled={saving}
+                  className="min-h-[400px] text-base leading-relaxed"
+                />
+              )}
+            </Field>
+
+            {/* Code */}
+            <div className="grid gap-5">
+              <h3 className="micro-text text-ink-subtle">Code (optional)</h3>
+              <div className="grid sm:grid-cols-[1fr,2fr] gap-4">
+                <Field id="codeLanguage" label="Language">
+                  <Select
+                    value={codeLanguage}
+                    onValueChange={setCodeLanguage}
+                    disabled={saving}
+                  >
+                    <SelectTrigger className="p-3 bg-surface border border-ink-faint text-ink h-auto">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent className="bg-surface border border-ink-faint text-ink">
+                      {LANGUAGES.map((l) => (
+                        <SelectItem key={l.value} value={l.value}>
+                          {l.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </Field>
+                <Field id="codeContent" label="Snippet">
+                  <Textarea
+                    id="codeContent"
+                    value={codeContent}
+                    onChange={(e) => setCodeContent(e.target.value)}
+                    placeholder="// Paste your code here…"
+                    disabled={saving}
+                    className="font-mono text-sm min-h-[180px]"
+                  />
+                </Field>
+              </div>
+            </div>
+
+            {/* Image */}
+            <Field
+              id="featured-image"
+              label="Featured image"
+              hint={selectedFile ? "New image selected" : "Current image"}
+            >
+              <div className="flex flex-col md:flex-row gap-4 items-stretch">
+                <label
+                  htmlFor="featured-image"
+                  className="flex-1 cursor-pointer border border-dashed border-ink-faint hover:border-accent p-8 flex flex-col items-center justify-center text-center transition-colors"
+                >
+                  <ImageIcon
+                    size={28}
+                    className="mb-3 text-ink-subtle"
+                    strokeWidth={1.5}
+                  />
+                  <span className="text-sm text-ink">
+                    {selectedFile
+                      ? selectedFile.name
+                      : "Click to replace image"}
+                  </span>
+                  <input
+                    type="file"
+                    id="featured-image"
+                    accept="image/*"
+                    onChange={handleFileChange}
+                    className="hidden"
+                    disabled={saving}
+                  />
+                </label>
+                {previewUrl && (
+                  <div className="relative w-full md:w-1/3 border border-ink-faint">
+                    <img
+                      src={previewUrl}
+                      alt="Preview"
+                      className="w-full h-full aspect-[4/3] object-cover"
+                    />
+                    <button
+                      type="button"
+                      onClick={handleRemoveImage}
+                      className="absolute top-2 right-2 w-8 h-8 bg-bg border border-danger text-danger flex items-center justify-center hover:bg-danger hover:text-ink transition-colors"
+                      aria-label="Remove image"
+                    >
+                      <XIcon size={14} />
+                    </button>
+                  </div>
+                )}
+              </div>
+            </Field>
+
+            <div className="flex items-center justify-between pt-6 border-t border-ink-faint">
+              <Button
+                type="button"
+                variant="ghost"
+                size="md"
+                onClick={() => navigate(-1)}
+                disabled={saving}
+              >
+                Cancel
+              </Button>
+              <Button
+                type="submit"
+                variant="accent"
+                size="lg"
+                disabled={saving}
+              >
+                {saving ? (
+                  <>
+                    <Loader2 size={16} className="animate-spin" />
+                    Saving…
+                  </>
+                ) : (
+                  <>
+                    <Save size={16} />
+                    Save changes
+                  </>
+                )}
+              </Button>
+            </div>
+          </form>
+        </Container>
+      </Section>
+    </div>
+  );
 };
 
 export default EditBlog;
